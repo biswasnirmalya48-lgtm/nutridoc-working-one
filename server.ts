@@ -692,4 +692,10 @@ async function startServer() {
   });
 }
 
-startServer();
+// On Vercel, the app is served as a serverless function (see api/index.ts)
+// and Vercel sets VERCEL=1, so we must not start a long-lived listener.
+if (process.env.VERCEL !== '1') {
+  startServer();
+}
+
+export default app;
