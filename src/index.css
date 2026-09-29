@@ -191,6 +191,15 @@
   animation: liquidCaptureRipple 0.75s cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }
 
+@keyframes shutterFlash {
+  0% { opacity: 0.8; }
+  100% { opacity: 0; }
+}
+
+.animate-shutter-flash {
+  animation: shutterFlash 0.2s ease-out forwards;
+}
+
 /* Respect user reduced motion */
 @media (prefers-reduced-motion: reduce) {
   *, ::before, ::after {

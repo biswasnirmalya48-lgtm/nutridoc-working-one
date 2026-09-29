@@ -1,5 +1,5 @@
 import React, { useRef, useState, useEffect } from 'react';
-import { RefreshCw, Zap, ZapOff, Image as ImageIcon, Check, X, AlertCircle, Search } from 'lucide-react';
+import { RefreshCw, Zap, ZapOff, Image as ImageIcon, X, AlertCircle, Search, Sparkles } from 'lucide-react';
 import { NutritionData, UserProfile } from '../../types';
 
 interface CameraScannerProps {
@@ -34,7 +34,11 @@ export const CameraScanner: React.FC<CameraScannerProps> = ({
   const [isProcessing, setIsProcessing] = useState<boolean>(false);
   const [loadingText, setLoadingText] = useState<string>('');
   const [detectedBarcode, setDetectedBarcode] = useState<string | null>(null);
-  const [autoCaptureCountdown, setAutoCaptureCountdown] = useState<number | null>(null);
+  const [isCapturing, setIsCapturing] = useState<boolean>(false);
+  const [shutterFlash, setShutterFlash] = useState<boolean>(false);
+
+  // Tap-to-focus visual ring coordinates
+  const [focusRing, setFocusRing] = useState<{ x: number; y: number } | null>(null);
 
   // Manual Name Search Drawer
   const [showSearchModal, setShowSearchModal] = useState<boolean>(false);
@@ -56,37 +60,6 @@ export const CameraScanner: React.FC<CameraScannerProps> = ({
 
   const isHindi = profile.language === 'hi';
   const isBengali = profile.language === 'bn';
-
-  // Auto-capture countdown for steady hands
-  useEffect(() => {
-    let timer: any = null;
-    let count = 3;
-
-    if ((step === 1 || step === 3) && stream && !isProcessing && !cameraError && !scanError && !showSearchModal) {
-      setAutoCaptureCountdown(3);
-      timer = setInterval(() => {
-        count -= 1;
-        if (count > 0) {
-          setAutoCaptureCountdown(count);
-        } else {
-          clearInterval(timer);
-          setAutoCaptureCountdown(null);
-          // Trigger automatic capture
-          if (step === 1) {
-            handleCaptureFront();
-          } else if (step === 3) {
-            handleCaptureBack();
-          }
-        }
-      }, 1000);
-    } else {
-      setAutoCaptureCountdown(null);
-    }
-
-    return () => {
-      if (timer) clearInterval(timer);
-    };
-  }, [step, stream, isProcessing, cameraError, scanError, showSearchModal]);
 
   // Initialize camera
   useEffect(() => {
@@ -210,11 +183,37 @@ export const CameraScanner: React.FC<CameraScannerProps> = ({
     return '';
   };
 
+  // Tap to focus effect
+  const handleViewportClick = (e: React.MouseEvent<HTMLDivElement>) => {
+    const rect = e.currentTarget.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    const y = e.clientY - rect.top;
+    setFocusRing({ x, y });
+    setTimeout(() => {
+      setFocusRing(null);
+    }, 750);
+  };
+
+  // Trigger tactile shutter animation
+  const triggerShutterFeedback = () => {
+    if (typeof navigator !== 'undefined' && navigator.vibrate) {
+      navigator.vibrate(18);
+    }
+    setShutterFlash(true);
+    setIsCapturing(true);
+    setTimeout(() => setShutterFlash(false), 200);
+    setTimeout(() => setIsCapturing(false), 750);
+  };
+
   // STEP 1: Front Packet Recognition Handler
   const handleCaptureFront = async (manualImage?: string, fallbackQueryText?: string) => {
+    if (!manualImage && !fallbackQueryText) {
+      triggerShutterFeedback();
+    }
+
     const capturedImg = manualImage || (!fallbackQueryText ? captureFrame() : '');
     if (!capturedImg && !fallbackQueryText) {
-      setScanError('Please ensure the camera is active, choose an image from your gallery, or search by name.');
+      setScanError('Please ensure camera is active or choose an image from gallery or search by name.');
       return;
     }
 
@@ -277,6 +276,10 @@ export const CameraScanner: React.FC<CameraScannerProps> = ({
 
   // STEP 3: Back / Nutrition Label Capture Handler
   const handleCaptureBack = async (manualImage?: string) => {
+    if (!manualImage) {
+      triggerShutterFeedback();
+    }
+
     const capturedBackImg = manualImage || captureFrame();
     if (!capturedBackImg) {
       setScanError('Please capture the ingredient table clearly.');
@@ -412,6 +415,11 @@ export const CameraScanner: React.FC<CameraScannerProps> = ({
         onChange={handleFileUpload}
       />
 
+      {/* Shutter White Flash Effect */}
+      {shutterFlash && (
+        <div className="absolute inset-0 z-50 bg-white pointer-events-none animate-shutter-flash" />
+      )}
+
       {/* Top Camera Controls Overlay */}
       <div className="relative z-20 flex items-center justify-between px-5 pt-12 pb-4 bg-gradient-to-b from-black/80 via-black/40 to-transparent">
         <button
@@ -421,12 +429,12 @@ export const CameraScanner: React.FC<CameraScannerProps> = ({
           <X className="w-5 h-5" />
         </button>
 
-        {/* Step Indicator */}
-        <div className="px-3.5 py-1 rounded-full bg-black/60 backdrop-blur-md border border-white/10 text-white/90 text-xs font-semibold tracking-wide flex items-center gap-1.5">
+        {/* Step Indicator Pill */}
+        <div className="px-3.5 py-1.5 rounded-full bg-black/60 backdrop-blur-md border border-white/10 text-white/90 text-xs font-medium tracking-wide flex items-center gap-1.5 shadow-sm">
           <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-          {step === 1 && (isHindi ? 'स्टेप 1: फ्रंट पैकेट पहचान' : isBengali ? 'ধাপ ১: সামনের দিক' : 'Step 1: Front Packet')}
-          {step === 2 && (isHindi ? 'गाइड: पैकेट पलटें' : isBengali ? 'গাইড: প্যাकेट ঘোরান' : 'Turn Packet')}
-          {step === 3 && (isHindi ? 'स्टेप 2: न्यूट्रिशन टेबल' : isBengali ? 'ধাপ ২: উপাদান তালিকা' : 'Step 2: Nutrition Table')}
+          {step === 1 && (isHindi ? 'स्टेप 1: फ्रंट पैकेट' : isBengali ? 'ধাপ ১: সামনের দিক' : 'Step 1: Front Packet')}
+          {step === 2 && (isHindi ? 'पैकेट पलटें' : isBengali ? 'প্যাকেট ঘোরান' : 'Turn Packet')}
+          {step === 3 && (isHindi ? 'स्टेप 2: न्यूट्रिशन' : isBengali ? 'ধাপ ২: পুষ্টি তালিকা' : 'Step 2: Nutrition Table')}
         </div>
 
         {/* Tools */}
@@ -456,7 +464,10 @@ export const CameraScanner: React.FC<CameraScannerProps> = ({
       </div>
 
       {/* Main Viewport */}
-      <div className="relative flex-1 flex items-center justify-center overflow-hidden">
+      <div
+        onClick={handleViewportClick}
+        className="relative flex-1 flex items-center justify-center overflow-hidden cursor-pointer"
+      >
         {/* Live Video Feed */}
         <video
           ref={videoRef}
@@ -465,6 +476,19 @@ export const CameraScanner: React.FC<CameraScannerProps> = ({
           muted
           className="absolute inset-0 w-full h-full object-cover"
         />
+
+        {/* Tap-to-focus ring feedback */}
+        {focusRing && (
+          <div
+            style={{ left: focusRing.x - 28, top: focusRing.y - 28 }}
+            className="pointer-events-none absolute w-14 h-14 rounded-xl border border-amber-300/90 shadow-[0_0_12px_rgba(252,211,77,0.3)] animate-scale-in"
+          >
+            <span className="absolute -top-1 left-1/2 -translate-x-1/2 w-2 h-0.5 bg-amber-300" />
+            <span className="absolute -bottom-1 left-1/2 -translate-x-1/2 w-2 h-0.5 bg-amber-300" />
+            <span className="absolute -left-1 top-1/2 -translate-y-1/2 w-0.5 h-2 bg-amber-300" />
+            <span className="absolute -right-1 top-1/2 -translate-y-1/2 w-0.5 h-2 bg-amber-300" />
+          </div>
+        )}
 
         {/* Fallback pattern if camera has error or permission denied */}
         {cameraError && (
@@ -478,13 +502,19 @@ export const CameraScanner: React.FC<CameraScannerProps> = ({
             </div>
             <div className="flex gap-2">
               <button
-                onClick={() => fileInputRef.current?.click()}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  fileInputRef.current?.click();
+                }}
                 className="px-4 py-2.5 rounded-full bg-white text-black text-xs font-semibold shadow-md active:scale-95 transition-transform"
               >
                 Upload Photo
               </button>
               <button
-                onClick={() => setShowSearchModal(true)}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setShowSearchModal(true);
+                }}
                 className="px-4 py-2.5 rounded-full bg-white/20 text-white text-xs font-semibold shadow-md active:scale-95 transition-transform backdrop-blur-md"
               >
                 Search Name
@@ -495,7 +525,10 @@ export const CameraScanner: React.FC<CameraScannerProps> = ({
 
         {/* Error notification banner */}
         {scanError && (
-          <div className="absolute top-4 inset-x-5 z-40 bg-rose-600/90 backdrop-blur-md text-white p-3.5 rounded-2xl border border-rose-400 text-xs shadow-lg flex items-start gap-2.5 animate-fade-in">
+          <div
+            onClick={(e) => e.stopPropagation()}
+            className="absolute top-4 inset-x-5 z-40 bg-rose-600/90 backdrop-blur-md text-white p-3.5 rounded-2xl border border-rose-400 text-xs shadow-lg flex items-start gap-2.5 animate-fade-in"
+          >
             <AlertCircle className="w-4 h-4 shrink-0 mt-0.5 text-white" />
             <div className="flex-1 space-y-1.5">
               <p className="font-semibold">{scanError}</p>
@@ -520,34 +553,35 @@ export const CameraScanner: React.FC<CameraScannerProps> = ({
         {/* STEP 1: Front Packet Scanning Reticle */}
         {step === 1 && (
           <div
-            className={`relative w-76 h-96 rounded-[24px] border shadow-[0_0_0_9999px_rgba(0,0,0,0.52)] flex flex-col items-center justify-between p-6 pointer-events-none transition-all duration-300 ${
-              autoCaptureCountdown !== null
-                ? 'border-emerald-500 camera-focus-pulse'
-                : 'border-white/70'
+            className={`relative w-76 h-96 rounded-[26px] border border-white/80 shadow-[0_0_0_9999px_rgba(0,0,0,0.52)] flex flex-col items-center justify-between p-6 pointer-events-none transition-all duration-300 ${
+              isCapturing ? 'camera-capture-ripple border-emerald-400' : ''
             }`}
           >
-            {/* Thin animated scan line only when scanning */}
-            {(isProcessing || autoCaptureCountdown !== null) && (
+            {/* Animated scan line when processing */}
+            {isProcessing && (
               <div className="absolute inset-x-4 h-0.5 camera-scan-line bg-gradient-to-r from-transparent via-emerald-400 to-transparent shadow-[0_0_8px_#10B981]" />
             )}
 
             <div className="w-full flex justify-center">
-              <span className="bg-black/60 backdrop-blur-md px-3.5 py-1 rounded-full text-white text-xs font-normal border border-white/10">
-                {autoCaptureCountdown !== null
-                  ? `Scanning in ${autoCaptureCountdown}s…`
-                  : detectedBarcode
-                  ? `Barcode: ${detectedBarcode}`
-                  : 'Point at the front of a food packet'}
+              <span className="bg-black/60 backdrop-blur-md px-3.5 py-1 rounded-full text-white text-xs font-normal border border-white/10 flex items-center gap-1.5">
+                {detectedBarcode ? (
+                  <>
+                    <Sparkles className="w-3 h-3 text-emerald-400" />
+                    <span>Barcode: {detectedBarcode}</span>
+                  </>
+                ) : (
+                  <span>Point at the front of a food packet</span>
+                )}
               </span>
             </div>
 
             <div className="text-center">
               <p className="text-white/80 text-xs font-normal">
                 {isHindi
-                  ? 'पैकेट का अगला भाग दिखाएं'
+                  ? 'पैकेट का अगला भाग दिखाएं और शटर दबाएं'
                   : isBengali
-                  ? 'প্যাকেটের সামনের দিক তাক করুন'
-                  : 'Point at the front of a food packet'}
+                  ? 'প্যাকেটের সামনের দিক তাক করে শাটার চাপুন'
+                  : 'Center packet in frame & tap shutter'}
               </p>
             </div>
           </div>
@@ -555,7 +589,10 @@ export const CameraScanner: React.FC<CameraScannerProps> = ({
 
         {/* STEP 2: "Turn the packet around" Simple Prompt Modal */}
         {step === 2 && (
-          <div className="relative z-30 max-w-xs mx-6 bg-white rounded-[24px] p-6 text-center text-[#161616] shadow-[0_4px_24px_rgba(0,0,0,0.12)] border border-black/[0.08] animate-fade-in space-y-4">
+          <div
+            onClick={(e) => e.stopPropagation()}
+            className="relative z-30 max-w-xs mx-6 bg-white rounded-[24px] p-6 text-center text-[#161616] shadow-[0_4px_24px_rgba(0,0,0,0.12)] border border-black/[0.08] animate-fade-in space-y-4"
+          >
             <div className="w-12 h-12 mx-auto rounded-2xl bg-[#F0EFEA] text-[#161616] flex items-center justify-center">
               <RefreshCw className="w-5 h-5 stroke-[2]" />
             </div>
@@ -631,32 +668,28 @@ export const CameraScanner: React.FC<CameraScannerProps> = ({
         {/* STEP 3: Back / Nutrition Facts Clean Scanning Reticle */}
         {step === 3 && (
           <div
-            className={`relative w-76 h-80 rounded-[24px] border shadow-[0_0_0_9999px_rgba(0,0,0,0.52)] flex flex-col items-center justify-between p-6 pointer-events-none transition-all duration-300 ${
-              autoCaptureCountdown !== null
-                ? 'border-emerald-500 camera-focus-pulse'
-                : 'border-white/70'
+            className={`relative w-76 h-80 rounded-[26px] border border-white/80 shadow-[0_0_0_9999px_rgba(0,0,0,0.52)] flex flex-col items-center justify-between p-6 pointer-events-none transition-all duration-300 ${
+              isCapturing ? 'camera-capture-ripple border-emerald-400' : ''
             }`}
           >
-            {/* Thin animated scan line */}
-            {(isProcessing || autoCaptureCountdown !== null) && (
+            {/* Animated scan line */}
+            {isProcessing && (
               <div className="absolute inset-x-4 h-0.5 camera-scan-line bg-gradient-to-r from-transparent via-emerald-400 to-transparent shadow-[0_0_8px_#10B981]" />
             )}
 
             <div className="w-full flex justify-center">
               <span className="bg-black/60 backdrop-blur-md px-3.5 py-1 rounded-full text-white text-xs font-normal border border-white/10">
-                {autoCaptureCountdown !== null
-                  ? `Scanning in ${autoCaptureCountdown}s…`
-                  : 'Turn the packet around. Scan the ingredients.'}
+                Turn the packet around. Scan the ingredients.
               </span>
             </div>
 
             <div className="text-center">
               <p className="text-white/80 text-xs font-normal">
                 {isHindi
-                  ? 'सामग्री और पोषण तालिका फ्रेम में रखें'
+                  ? 'सामग्री और पोषण तालिका फ्रेम में रखें और शटर दबाएं'
                   : isBengali
-                  ? 'উপাদান ও পুষ্টি তালিকা ফ্রেমের মাঝে রাখুন'
-                  : 'Turn the packet around. Scan the ingredients.'}
+                  ? 'উপাদান ও পুষ্টি তালিকা ফ্রেমের মাঝে রাখুন ও শাটার চাপুন'
+                  : 'Align nutrition table & tap shutter'}
               </p>
             </div>
           </div>
@@ -664,7 +697,10 @@ export const CameraScanner: React.FC<CameraScannerProps> = ({
 
         {/* Processing Calm Morphing Liquid Dot Animation Overlay */}
         {isProcessing && (
-          <div className="absolute inset-0 z-40 bg-black/80 backdrop-blur-md flex flex-col items-center justify-center p-6 text-center space-y-4 animate-fade-in">
+          <div
+            onClick={(e) => e.stopPropagation()}
+            className="absolute inset-0 z-40 bg-black/80 backdrop-blur-md flex flex-col items-center justify-center p-6 text-center space-y-4 animate-fade-in"
+          >
             <div className="flex items-center gap-2 justify-center py-2">
               <div className="w-3.5 h-3.5 rounded-full bg-emerald-400 animate-liquid-dot-1 shadow-[0_0_12px_rgba(52,211,153,0.6)]" />
               <div className="w-3.5 h-3.5 rounded-full bg-emerald-400 animate-liquid-dot-2 shadow-[0_0_12px_rgba(52,211,153,0.6)]" />
@@ -744,7 +780,8 @@ export const CameraScanner: React.FC<CameraScannerProps> = ({
               if (step === 3) handleCaptureBack();
             }}
             disabled={isProcessing}
-            className="group relative w-19 h-19 rounded-full border-4 border-white/80 p-1 flex items-center justify-center active:scale-95 transition-transform backdrop-blur-md shadow-[0_4px_24px_rgba(0,0,0,0.35)]"
+            aria-label="Capture photo"
+            className="group relative w-19 h-19 rounded-full border-4 border-white/80 p-1 flex items-center justify-center active:scale-90 transition-transform backdrop-blur-md shadow-[0_4px_24px_rgba(0,0,0,0.35)]"
           >
             <div className="w-full h-full rounded-full bg-white transition-all group-hover:scale-95 group-active:scale-90 shadow-inner" />
           </button>
