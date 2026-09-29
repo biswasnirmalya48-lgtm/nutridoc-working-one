@@ -221,7 +221,7 @@ export const CameraScanner: React.FC<CameraScannerProps> = ({
     setIsProcessing(true);
     setScanError(null);
     setLoadingText(
-      isHindi ? 'पैकेट पहचाना जा रहा है…' : isBengali ? 'পণ্য শনাক্ত করা হচ্ছে…' : 'Recognising product…'
+      isHindi ? 'पैकेट स्कैन किया जा रहा है…' : isBengali ? 'পণ্য স্ক্যান করা হচ্ছে…' : 'Scanning product'
     );
 
     if (capturedImg) {
@@ -286,7 +286,7 @@ export const CameraScanner: React.FC<CameraScannerProps> = ({
     setIsProcessing(true);
     setScanError(null);
     setLoadingText(
-      isHindi ? 'पोषण तालिका पढ़ी जा रही है…' : isBengali ? 'পুষ্টি तालिका পড়া হচ্ছে…' : 'Reading nutrition label…'
+      isHindi ? 'सामग्री पढ़ी जा रही है…' : isBengali ? 'উপাদান পড়া হচ্ছে…' : 'Reading ingredients'
     );
 
     try {
@@ -416,7 +416,7 @@ export const CameraScanner: React.FC<CameraScannerProps> = ({
       <div className="relative z-20 flex items-center justify-between px-5 pt-12 pb-4 bg-gradient-to-b from-black/80 via-black/40 to-transparent">
         <button
           onClick={onCancel}
-          className="w-10 h-10 rounded-full bg-white/15 backdrop-blur-md text-white flex items-center justify-center hover:bg-white/25 active:scale-95 transition-all"
+          className="w-10 h-10 rounded-full liquid-glass-control text-white flex items-center justify-center active:scale-95 transition-all shadow-md"
         >
           <X className="w-5 h-5" />
         </button>
@@ -433,22 +433,22 @@ export const CameraScanner: React.FC<CameraScannerProps> = ({
         <div className="flex items-center gap-2">
           <button
             onClick={() => setShowSearchModal(true)}
-            className="w-10 h-10 rounded-full bg-white/15 backdrop-blur-md text-white flex items-center justify-center hover:bg-white/25 active:scale-95 transition-all"
+            className="w-10 h-10 rounded-full liquid-glass-control text-white flex items-center justify-center active:scale-95 transition-all shadow-md"
             title="Search by name"
           >
             <Search className="w-4 h-4" />
           </button>
           <button
             onClick={toggleTorch}
-            className={`w-10 h-10 rounded-full backdrop-blur-md flex items-center justify-center active:scale-95 transition-all ${
-              torchOn ? 'bg-amber-400 text-black' : 'bg-white/15 text-white hover:bg-white/25'
+            className={`w-10 h-10 rounded-full liquid-glass-control flex items-center justify-center active:scale-95 transition-all shadow-md ${
+              torchOn ? 'bg-amber-400 text-black border-amber-300' : 'text-white'
             }`}
           >
             {torchOn ? <Zap className="w-5 h-5 fill-current" /> : <ZapOff className="w-5 h-5" />}
           </button>
           <button
             onClick={switchCamera}
-            className="w-10 h-10 rounded-full bg-white/15 backdrop-blur-md text-white flex items-center justify-center hover:bg-white/25 active:scale-95 transition-all"
+            className="w-10 h-10 rounded-full liquid-glass-control text-white flex items-center justify-center active:scale-95 transition-all shadow-md"
           >
             <RefreshCw className="w-5 h-5" />
           </button>
@@ -519,91 +519,81 @@ export const CameraScanner: React.FC<CameraScannerProps> = ({
 
         {/* STEP 1: Front Packet Scanning Reticle */}
         {step === 1 && (
-          <div className="relative w-76 h-92 rounded-3xl border-2 border-white/70 shadow-[0_0_0_9999px_rgba(0,0,0,0.58)] flex flex-col items-center justify-between p-6 pointer-events-none transition-all">
-            <div className="absolute -top-1 -left-1 w-6 h-6 border-t-3 border-l-3 border-white rounded-tl-xl" />
-            <div className="absolute -top-1 -right-1 w-6 h-6 border-t-3 border-r-3 border-white rounded-tr-xl" />
-            <div className="absolute -bottom-1 -left-1 w-6 h-6 border-b-3 border-l-3 border-white rounded-bl-xl" />
-            <div className="absolute -bottom-1 -right-1 w-6 h-6 border-b-3 border-r-3 border-white rounded-br-xl" />
-
-            <div className="absolute inset-x-4 h-0.5 bg-gradient-to-r from-transparent via-emerald-400 to-transparent shadow-[0_0_12px_#34D399] animate-[bounce_2.5s_infinite]" />
+          <div
+            className={`relative w-76 h-96 rounded-[24px] border shadow-[0_0_0_9999px_rgba(0,0,0,0.52)] flex flex-col items-center justify-between p-6 pointer-events-none transition-all duration-300 ${
+              autoCaptureCountdown !== null
+                ? 'border-emerald-500 camera-focus-pulse'
+                : 'border-white/70'
+            }`}
+          >
+            {/* Thin animated scan line only when scanning */}
+            {(isProcessing || autoCaptureCountdown !== null) && (
+              <div className="absolute inset-x-4 h-0.5 camera-scan-line bg-gradient-to-r from-transparent via-emerald-400 to-transparent shadow-[0_0_8px_#10B981]" />
+            )}
 
             <div className="w-full flex justify-center">
-              <span className={`backdrop-blur-md px-3.5 py-1 rounded-full text-white text-[11px] font-semibold tracking-wide border transition-all ${
-                autoCaptureCountdown !== null
-                  ? 'bg-emerald-600/90 border-emerald-400 text-white shadow-lg animate-pulse'
-                  : 'bg-black/70 border-white/10'
-              }`}>
+              <span className="bg-black/60 backdrop-blur-md px-3.5 py-1 rounded-full text-white text-xs font-normal border border-white/10">
                 {autoCaptureCountdown !== null
-                  ? `Hold steady • Auto-capturing in ${autoCaptureCountdown}s`
+                  ? `Scanning in ${autoCaptureCountdown}s…`
                   : detectedBarcode
                   ? `Barcode: ${detectedBarcode}`
-                  : 'Position Item or Packet Inside Frame'}
+                  : 'Point at the front of a food packet'}
               </span>
             </div>
 
-            <div className="text-center bg-black/70 backdrop-blur-md px-4 py-2.5 rounded-2xl border border-white/15">
-              <p className="text-white text-xs font-medium">
+            <div className="text-center">
+              <p className="text-white/80 text-xs font-normal">
                 {isHindi
-                  ? 'खाद्य पैकेट या फल/स्नैक पर पॉइंट करें • अपने आप कैप्चर होगा'
+                  ? 'पैकेट का अगला भाग दिखाएं'
                   : isBengali
-                  ? 'খাদ্য প্যাকেট বা ফলে ফোকাস করুন • নিজে থেকেই ক্যাপচার হবে'
-                  : 'Point at food packet, snack, or fruit • Auto-captures'}
+                  ? 'প্যাকেটের সামনের দিক তাক করুন'
+                  : 'Point at the front of a food packet'}
               </p>
             </div>
           </div>
         )}
 
-        {/* STEP 2: "Turn the packet around" Guide Modal */}
+        {/* STEP 2: "Turn the packet around" Simple Prompt Modal */}
         {step === 2 && (
-          <div className="relative z-30 max-w-sm mx-5 bg-[#F7F7F5] rounded-3xl p-6 text-center text-[#1D1D1F] shadow-2xl border border-black/10 animate-scale-in">
-            <div className="w-16 h-16 mx-auto mb-4 rounded-2xl bg-black text-white flex items-center justify-center shadow-md animate-pulse">
-              <RefreshCw className="w-8 h-8 text-emerald-400 stroke-[2]" />
+          <div className="relative z-30 max-w-xs mx-6 bg-white rounded-[24px] p-6 text-center text-[#161616] shadow-[0_4px_24px_rgba(0,0,0,0.12)] border border-black/[0.08] animate-fade-in space-y-4">
+            <div className="w-12 h-12 mx-auto rounded-2xl bg-[#F0EFEA] text-[#161616] flex items-center justify-center">
+              <RefreshCw className="w-5 h-5 stroke-[2]" />
             </div>
 
-            <div className="inline-flex items-center gap-1.5 px-3 py-0.5 rounded-full bg-emerald-50 text-emerald-800 text-[11px] font-bold border border-emerald-100 mb-2">
-              <Check className="w-3.5 h-3.5" />
-              <span>Product Recognized</span>
+            <div className="space-y-1">
+              <h3 className="text-base font-semibold tracking-tight text-[#161616]">
+                {isHindi ? 'पैकेट को पलटें' : isBengali ? 'প্যাকেটটি উল্টো করুন' : 'Turn the packet around.'}
+              </h3>
+              <p className="text-xs text-[#737373]">
+                {isHindi
+                  ? 'सामग्री और पोषण तालिका को स्कैन करें'
+                  : isBengali
+                  ? 'উপাদান ও পুষ্টি তালিকা স্ক্যান করুন'
+                  : 'Scan the ingredients.'}
+              </p>
             </div>
 
-            <h3 className="text-xl font-bold tracking-tight text-[#1D1D1F]">
-              {isHindi ? 'पैकेट को पलटें' : isBengali ? 'প্যাকেটটি উল্টো করুন' : 'Turn the packet around'}
-            </h3>
-
-            <p className="text-sm text-[#86868B] mt-1.5 leading-relaxed">
-              {isHindi
-                ? 'हमें पोषण तालिका व सामग्री सूची (Nutrition Table & Ingredients) की आवश्यकता है।'
-                : isBengali
-                ? 'আমাদের উপাদানের তালিকা ও পুষ্টি মান দেখতে হবে।'
-                : 'We need the ingredient table.'}
-            </p>
-
-            {/* Recognized Product Badge */}
-            <div className="mt-4 flex items-center gap-3 p-2.5 rounded-2xl bg-white border border-black/5 text-xs text-[#1D1D1F]">
+            {/* Recognized Product Snippet */}
+            <div className="flex items-center gap-2.5 p-2.5 rounded-xl bg-[#F7F7F5] border border-black/[0.04] text-left text-xs">
               {frontImage && (
                 <img
                   src={frontImage}
                   alt="Front preview"
-                  className="w-11 h-11 rounded-xl object-cover bg-black/5 shrink-0"
+                  className="w-10 h-10 rounded-lg object-cover bg-black/5 shrink-0"
                 />
               )}
-              <div className="text-left min-w-0">
-                {productMetadata.brand && (
-                  <p className="text-[10px] uppercase font-bold text-[#86868B] leading-none">
-                    {productMetadata.brand}
-                  </p>
-                )}
-                <p className="font-bold text-xs truncate mt-0.5">{productMetadata.name}</p>
-                <p className="text-[10px] text-emerald-700 font-medium">{productMetadata.category}</p>
+              <div className="min-w-0">
+                <p className="font-medium text-xs text-[#161616] truncate">{productMetadata.name}</p>
+                <p className="text-[10px] text-[#737373]">{productMetadata.category}</p>
               </div>
             </div>
 
-            <div className="mt-6 flex flex-col gap-2.5">
+            <div className="space-y-2 pt-1">
               <button
                 onClick={() => setStep(3)}
-                className="w-full py-3.5 rounded-full bg-black text-white text-xs font-semibold shadow-md active:scale-95 transition-transform flex items-center justify-center gap-2"
+                className="w-full py-3 rounded-full bg-[#161616] text-white text-xs font-semibold active:scale-[0.98] transition-transform"
               >
-                <span>{isHindi ? 'इंग्रीडिएंट्स टेबल स्कैन करें (स्टेप 2)' : isBengali ? 'উপাদান স্ক্যান করুন (ধাপ ২)' : 'Scan Ingredient Table (Step 2)'}</span>
-                <span>→</span>
+                {isHindi ? 'सामग्री स्कैन करें' : isBengali ? 'উপাদান স্ক্যান করুন' : 'Scan the ingredients'}
               </button>
 
               <button
@@ -630,55 +620,65 @@ export const CameraScanner: React.FC<CameraScannerProps> = ({
                     },
                   });
                 }}
-                className="w-full py-3 rounded-full bg-white text-[#1D1D1F] border border-black/10 text-xs font-medium hover:bg-black/5 active:scale-95 transition-transform"
+                className="w-full py-2.5 text-xs text-[#737373] hover:text-[#161616] active:scale-[0.98] transition-colors"
               >
-                {isHindi ? 'पहचाने गए पोषण के साथ आगे बढ़ें' : isBengali ? 'অনুমিত পুষ্টি মান নিয়ে এগিয়ে চলুন' : 'Continue with Recognized Nutrition →'}
+                {isHindi ? 'अनुमानित पोषण के साथ आगे बढ़ें' : isBengali ? 'অনুমিত পুষ্টি নিয়ে চলুন' : 'Continue with recognized values'}
               </button>
             </div>
           </div>
         )}
 
-        {/* STEP 3: Back / Nutrition Facts Scanning Reticle */}
+        {/* STEP 3: Back / Nutrition Facts Clean Scanning Reticle */}
         {step === 3 && (
-          <div className="relative w-80 h-76 rounded-3xl border-2 border-emerald-400 shadow-[0_0_0_9999px_rgba(0,0,0,0.58)] flex flex-col items-center justify-between p-6 pointer-events-none transition-all">
-            <div className="absolute -top-1 -left-1 w-6 h-6 border-t-3 border-l-3 border-emerald-400 rounded-tl-xl" />
-            <div className="absolute -top-1 -right-1 w-6 h-6 border-t-3 border-r-3 border-emerald-400 rounded-tr-xl" />
-            <div className="absolute -bottom-1 -left-1 w-6 h-6 border-b-3 border-l-3 border-emerald-400 rounded-bl-xl" />
-            <div className="absolute -bottom-1 -right-1 w-6 h-6 border-b-3 border-r-3 border-emerald-400 rounded-br-xl" />
-
-            <div className="absolute inset-x-4 h-0.5 bg-gradient-to-r from-transparent via-emerald-300 to-transparent shadow-[0_0_12px_#10B981] animate-[bounce_2s_infinite]" />
+          <div
+            className={`relative w-76 h-80 rounded-[24px] border shadow-[0_0_0_9999px_rgba(0,0,0,0.52)] flex flex-col items-center justify-between p-6 pointer-events-none transition-all duration-300 ${
+              autoCaptureCountdown !== null
+                ? 'border-emerald-500 camera-focus-pulse'
+                : 'border-white/70'
+            }`}
+          >
+            {/* Thin animated scan line */}
+            {(isProcessing || autoCaptureCountdown !== null) && (
+              <div className="absolute inset-x-4 h-0.5 camera-scan-line bg-gradient-to-r from-transparent via-emerald-400 to-transparent shadow-[0_0_8px_#10B981]" />
+            )}
 
             <div className="w-full flex justify-center">
-              <span className={`backdrop-blur-md px-3.5 py-1 rounded-full text-white text-[11px] font-semibold border transition-all ${
-                autoCaptureCountdown !== null
-                  ? 'bg-emerald-600/90 border-emerald-400 animate-pulse text-white shadow-lg'
-                  : 'bg-emerald-950/80 border-emerald-500/20 text-emerald-300'
-              }`}>
+              <span className="bg-black/60 backdrop-blur-md px-3.5 py-1 rounded-full text-white text-xs font-normal border border-white/10">
                 {autoCaptureCountdown !== null
-                  ? `Hold steady • Reading label in ${autoCaptureCountdown}s`
-                  : 'Ingredients & Nutrition Facts'}
+                  ? `Scanning in ${autoCaptureCountdown}s…`
+                  : 'Turn the packet around. Scan the ingredients.'}
               </span>
             </div>
 
-            <div className="text-center bg-black/70 backdrop-blur-md px-4 py-2 rounded-2xl border border-white/15">
-              <p className="text-white text-xs font-medium">
+            <div className="text-center">
+              <p className="text-white/80 text-xs font-normal">
                 {isHindi
-                  ? 'सामग्री और पोषण तालिका को फ्रेम में रखें'
+                  ? 'सामग्री और पोषण तालिका फ्रेम में रखें'
                   : isBengali
                   ? 'উপাদান ও পুষ্টি তালিকা ফ্রেমের মাঝে রাখুন'
-                  : 'Hold steady over nutrition & ingredients table'}
+                  : 'Turn the packet around. Scan the ingredients.'}
               </p>
             </div>
           </div>
         )}
 
-        {/* Processing Spinner Overlay */}
+        {/* Processing Calm Morphing Liquid Dot Animation Overlay */}
         {isProcessing && (
-          <div className="absolute inset-0 z-40 bg-black/75 backdrop-blur-sm flex flex-col items-center justify-center p-6 text-center space-y-4">
-            <div className="w-12 h-12 rounded-full border-3 border-white/20 border-t-emerald-400 animate-spin" />
+          <div className="absolute inset-0 z-40 bg-black/80 backdrop-blur-md flex flex-col items-center justify-center p-6 text-center space-y-4 animate-fade-in">
+            <div className="flex items-center gap-2 justify-center py-2">
+              <div className="w-3.5 h-3.5 rounded-full bg-emerald-400 animate-liquid-dot-1 shadow-[0_0_12px_rgba(52,211,153,0.6)]" />
+              <div className="w-3.5 h-3.5 rounded-full bg-emerald-400 animate-liquid-dot-2 shadow-[0_0_12px_rgba(52,211,153,0.6)]" />
+              <div className="w-3.5 h-3.5 rounded-full bg-emerald-400 animate-liquid-dot-3 shadow-[0_0_12px_rgba(52,211,153,0.6)]" />
+            </div>
             <div className="space-y-1">
-              <p className="text-white text-sm font-semibold tracking-wide">{loadingText}</p>
-              <p className="text-white/60 text-xs">Extracting precise values...</p>
+              <p className="text-white text-base font-semibold tracking-tight">{loadingText}</p>
+              <p className="text-white/60 text-xs">
+                {loadingText === 'Scanning product'
+                  ? 'Identifying packaging and brand…'
+                  : loadingText === 'Reading ingredients'
+                  ? 'Extracting nutrition values…'
+                  : 'Preparing your result'}
+              </p>
             </div>
           </div>
         )}
@@ -725,34 +725,34 @@ export const CameraScanner: React.FC<CameraScannerProps> = ({
         </div>
       )}
 
-      {/* Bottom Shutter & Controls Tray */}
+      {/* Bottom Shutter & Controls Tray with Floating Glass Controls */}
       {step !== 2 && (
-        <div className="relative z-20 px-8 pt-3 pb-8 bg-gradient-to-t from-black/95 via-black/60 to-transparent flex items-center justify-between">
+        <div className="relative z-20 px-8 pt-4 pb-9 bg-gradient-to-t from-black/90 via-black/50 to-transparent flex items-center justify-between">
           {/* Gallery Upload Button */}
           <button
             onClick={() => fileInputRef.current?.click()}
-            className="w-12 h-12 rounded-full bg-white/15 backdrop-blur-md text-white flex items-center justify-center hover:bg-white/25 active:scale-95 transition-all"
+            className="w-12 h-12 rounded-full liquid-glass-control text-white flex items-center justify-center active:scale-95 transition-all shadow-lg"
             title="Upload photo from gallery"
           >
             <ImageIcon className="w-5 h-5" />
           </button>
 
-          {/* Apple Shutter Button */}
+          {/* Apple Floating Glass Shutter Button */}
           <button
             onClick={() => {
               if (step === 1) handleCaptureFront();
               if (step === 3) handleCaptureBack();
             }}
             disabled={isProcessing}
-            className="group relative w-19 h-19 rounded-full border-4 border-white/90 p-1 flex items-center justify-center active:scale-95 transition-transform"
+            className="group relative w-19 h-19 rounded-full border-4 border-white/80 p-1 flex items-center justify-center active:scale-95 transition-transform backdrop-blur-md shadow-[0_4px_24px_rgba(0,0,0,0.35)]"
           >
-            <div className="w-full h-full rounded-full bg-white transition-all group-hover:scale-95 group-active:scale-90" />
+            <div className="w-full h-full rounded-full bg-white transition-all group-hover:scale-95 group-active:scale-90 shadow-inner" />
           </button>
 
           {/* Camera Switch Button */}
           <button
             onClick={switchCamera}
-            className="w-12 h-12 rounded-full bg-white/15 backdrop-blur-md text-white flex items-center justify-center hover:bg-white/25 active:scale-95 transition-all"
+            className="w-12 h-12 rounded-full liquid-glass-control text-white flex items-center justify-center active:scale-95 transition-all shadow-lg"
             title="Switch camera"
           >
             <RefreshCw className="w-5 h-5" />

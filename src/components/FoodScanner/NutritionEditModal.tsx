@@ -96,28 +96,29 @@ export const NutritionEditModal: React.FC<NutritionEditModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 bg-[#F7F7F5] overflow-y-auto flex flex-col justify-between">
-      {/* Top Header */}
-      <div className="sticky top-0 z-30 bg-[#F7F7F5]/90 backdrop-blur-md border-b border-black/[0.04] px-4 h-14 flex items-center justify-between">
-        <button
-          onClick={onCancel}
-          className="w-9 h-9 rounded-full bg-black/5 flex items-center justify-center text-[#1D1D1F] hover:bg-black/10 active:scale-95 transition-all"
-        >
-          <ArrowLeft className="w-4 h-4" />
-        </button>
-        <div className="text-center">
-          <h3 className="text-sm font-bold text-[#1D1D1F]">
-            {isHindi ? 'पोषक तत्वों की समीक्षा' : isBengali ? 'পুষ্টি মান পরীক্ষা' : 'Review Extracted Values'}
-          </h3>
-          <p className="text-[10px] text-[#86868B]">
-            {isHindi ? 'विश्लेषण से पहले सही करें' : isBengali ? 'বিশ্লেষণের পূর্বে সঠিক করুন' : 'Confirm or edit OCR readings'}
-          </p>
+    <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-md overflow-y-auto flex flex-col justify-end sm:justify-center p-0 sm:p-4 animate-fade-in">
+      <div className="w-full max-w-md mx-auto bg-[#FBFBFA] rounded-t-[32px] sm:rounded-[28px] overflow-hidden shadow-[0_8px_32px_rgba(0,0,0,0.18)] border border-black/[0.08] flex flex-col max-h-[92vh]">
+        {/* Top Header */}
+        <div className="sticky top-0 z-30 bg-[#FBFBFA]/90 backdrop-blur-md border-b border-black/[0.06] px-4 h-14 flex items-center justify-between shrink-0">
+          <button
+            onClick={onCancel}
+            className="w-9 h-9 rounded-full liquid-glass-capsule flex items-center justify-center text-[#161616] liquid-ripple active:scale-95 transition-all"
+          >
+            <ArrowLeft className="w-4 h-4" />
+          </button>
+          <div className="text-center">
+            <h3 className="text-sm font-semibold text-[#161616]">
+              {isHindi ? 'पोषक तत्वों की समीक्षा' : isBengali ? 'পুষ্টি মান পরীক্ষা' : 'Review Extracted Values'}
+            </h3>
+            <p className="text-[10px] text-[#737373]">
+              {isHindi ? 'विश्लेषण से पहले सही करें' : isBengali ? 'বিশ্লেষণের পূর্বে সঠিক করুন' : 'Confirm or edit OCR readings'}
+            </p>
+          </div>
+          <div className="w-9" />
         </div>
-        <div className="w-9" />
-      </div>
 
-      {/* Main Content Form */}
-      <div className="max-w-md w-full mx-auto px-5 py-6 space-y-6">
+        {/* Scrollable Form Body */}
+        <div className="overflow-y-auto px-5 py-5 space-y-5">
         {/* Scanned Image & Product Info Card */}
         <div className="bg-white rounded-3xl p-4 border border-black/[0.06] shadow-xs flex items-center gap-4">
           {initialData.frontImageUrl ? (
@@ -329,12 +330,11 @@ export const NutritionEditModal: React.FC<NutritionEditModalProps> = ({
         </div>
       </div>
 
-      {/* Sticky Bottom Action */}
-      <div className="sticky bottom-0 z-30 bg-[#F7F7F5]/95 backdrop-blur-md border-t border-black/[0.05] p-4 pb-6">
-        <div className="max-w-md mx-auto">
+        {/* Sticky Bottom Action */}
+        <div className="sticky bottom-0 z-30 bg-[#FBFBFA]/95 backdrop-blur-md border-t border-black/[0.06] p-4 shrink-0">
           <button
             onClick={handleSubmit}
-            className="w-full py-4 rounded-full bg-black text-white text-sm font-semibold shadow-lg hover:bg-neutral-800 active:scale-[0.985] transition-all flex items-center justify-center gap-2"
+            className="w-full py-3.5 rounded-full bg-[#161616] text-white text-sm font-semibold shadow-md active:scale-[0.985] transition-all flex items-center justify-center gap-2 liquid-ripple"
           >
             <span>{isHindi ? 'स्वास्थ्य विश्लेषण शुरू करें' : isBengali ? 'স্বাস্থ্য বিশ্লেষণ শুরু করুন' : 'Confirm & Analyze Health'}</span>
             <Check className="w-4 h-4" />

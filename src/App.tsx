@@ -4,6 +4,7 @@
  */
 
 import React, { useState, useEffect } from 'react';
+import { AnimatePresence, motion } from 'motion/react';
 import { Header } from './components/Header';
 import { BottomNav } from './components/BottomNav';
 import { HomeView } from './components/HomeView';
@@ -187,7 +188,7 @@ export default function App() {
   };
 
   return (
-    <div className="min-h-screen bg-[#F7F7F5] text-[#1D1D1F] flex flex-col font-sans antialiased selection:bg-[#E5E5EA]">
+    <div className="min-h-screen bg-[#F7F7F5] text-[#161616] flex flex-col font-sans antialiased selection:bg-neutral-200">
       {/* Top Apple Minimal Header */}
       <Header
         profile={profile}
@@ -199,95 +200,152 @@ export default function App() {
       />
 
       {/* Main Responsive Viewport Area */}
-      <main className="flex-1 w-full max-w-md mx-auto px-4 pt-3 pb-20">
-        {/* VIEW 1: Live Food Camera Scanner */}
-        {activeView === 'food_camera' && (
-          <CameraScanner
-            onCaptureComplete={handleFoodCaptureComplete}
-            onCancel={() => setActiveView('main')}
-            profile={profile}
-          />
-        )}
-
-        {/* VIEW 2: Nutrition Confirmation & Edit Screen */}
-        {activeView === 'food_confirm' && stagedFoodData && (
-          <NutritionEditModal
-            initialData={stagedFoodData}
-            onConfirm={handleFoodConfirmed}
-            onCancel={() => setActiveView('main')}
-            profile={profile}
-          />
-        )}
-
-        {/* VIEW 3: Food Result Screen */}
-        {activeView === 'food_result' && activeFoodResult && (
-          <FoodResultView
-            result={activeFoodResult}
-            onBack={() => setActiveView('main')}
-            onScanAnother={() => setActiveView('food_camera')}
-            profile={profile}
-          />
-        )}
-
-        {/* VIEW 4: Prescription & Report Scanner */}
-        {activeView === 'report_scanner' && (
-          <ReportScanner
-            onAnalyzeComplete={handleReportAnalysisComplete}
-            onCancel={() => setActiveView('main')}
-            profile={profile}
-          />
-        )}
-
-        {/* VIEW 5: Report Result Screen */}
-        {activeView === 'report_result' && activeReportResult && (
-          <ReportResultView
-            result={activeReportResult}
-            onBack={() => setActiveView('main')}
-            onScanAnother={() => setActiveView('report_scanner')}
-            profile={profile}
-          />
-        )}
-
-        {/* VIEW 6: Home Screen or Bottom Tabs */}
-        {activeView === 'main' && (
-          <>
-            {activeTab === 'home' && (
-              <HomeView
-                onStartFoodScan={() => setActiveView('food_camera')}
-                onStartReportScan={() => setActiveView('report_scanner')}
+      <main className="flex-1 w-full max-w-md mx-auto px-4 pt-3 pb-24 relative">
+        <AnimatePresence mode="wait">
+          {/* VIEW 1: Live Food Camera Scanner */}
+          {activeView === 'food_camera' && (
+            <motion.div
+              key="food_camera"
+              initial={{ opacity: 0, y: 8 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.985 }}
+              transition={{ duration: 0.22, ease: [0.16, 1, 0.3, 1] }}
+            >
+              <CameraScanner
+                onCaptureComplete={handleFoodCaptureComplete}
+                onCancel={() => setActiveView('main')}
                 profile={profile}
               />
-            )}
+            </motion.div>
+          )}
 
-            {activeTab === 'history' && (
-              <HistoryView
-                history={scanHistory}
-                onSelectFood={(f) => {
-                  setActiveFoodResult(f);
-                  setActiveView('food_result');
-                }}
-                onSelectReport={(r) => {
-                  setActiveReportResult(r);
-                  setActiveView('report_result');
-                }}
-                onClearHistory={handleClearHistory}
-                onStartFoodScan={() => setActiveView('food_camera')}
-                onStartReportScan={() => setActiveView('report_scanner')}
+          {/* VIEW 2: Nutrition Confirmation & Edit Screen */}
+          {activeView === 'food_confirm' && stagedFoodData && (
+            <motion.div
+              key="food_confirm"
+              initial={{ opacity: 0, y: 16 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: 12 }}
+              transition={{ duration: 0.24, ease: [0.16, 1, 0.3, 1] }}
+            >
+              <NutritionEditModal
+                initialData={stagedFoodData}
+                onConfirm={handleFoodConfirmed}
+                onCancel={() => setActiveView('main')}
                 profile={profile}
               />
-            )}
+            </motion.div>
+          )}
 
-            {activeTab === 'profile' && (
-              <ProfileView
+          {/* VIEW 3: Food Result Screen */}
+          {activeView === 'food_result' && activeFoodResult && (
+            <motion.div
+              key="food_result"
+              initial={{ opacity: 0, y: 8 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.985 }}
+              transition={{ duration: 0.22, ease: [0.16, 1, 0.3, 1] }}
+            >
+              <FoodResultView
+                result={activeFoodResult}
+                onBack={() => setActiveView('main')}
+                onScanAnother={() => setActiveView('food_camera')}
                 profile={profile}
-                onUpdateProfile={(updated) => setProfile(updated)}
               />
-            )}
-          </>
-        )}
+            </motion.div>
+          )}
+
+          {/* VIEW 4: Prescription & Report Scanner */}
+          {activeView === 'report_scanner' && (
+            <motion.div
+              key="report_scanner"
+              initial={{ opacity: 0, y: 8 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.985 }}
+              transition={{ duration: 0.22, ease: [0.16, 1, 0.3, 1] }}
+            >
+              <ReportScanner
+                onAnalyzeComplete={handleReportAnalysisComplete}
+                onCancel={() => setActiveView('main')}
+                profile={profile}
+              />
+            </motion.div>
+          )}
+
+          {/* VIEW 5: Report Result Screen */}
+          {activeView === 'report_result' && activeReportResult && (
+            <motion.div
+              key="report_result"
+              initial={{ opacity: 0, y: 8 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.985 }}
+              transition={{ duration: 0.22, ease: [0.16, 1, 0.3, 1] }}
+            >
+              <ReportResultView
+                result={activeReportResult}
+                onBack={() => setActiveView('main')}
+                onScanAnother={() => setActiveView('report_scanner')}
+                profile={profile}
+              />
+            </motion.div>
+          )}
+
+          {/* VIEW 6: Home Screen or Bottom Tabs */}
+          {activeView === 'main' && (
+            <motion.div
+              key={`main_${activeTab}`}
+              initial={{ opacity: 0, y: 8 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.985 }}
+              transition={{ duration: 0.2, ease: [0.16, 1, 0.3, 1] }}
+            >
+              {activeTab === 'home' && (
+                <HomeView
+                  onStartFoodScan={() => setActiveView('food_camera')}
+                  onStartReportScan={() => setActiveView('report_scanner')}
+                  profile={profile}
+                  history={scanHistory}
+                  onSelectFood={(f) => {
+                    setActiveFoodResult(f);
+                    setActiveView('food_result');
+                  }}
+                  onSelectReport={(r) => {
+                    setActiveReportResult(r);
+                    setActiveView('report_result');
+                  }}
+                />
+              )}
+
+              {activeTab === 'history' && (
+                <HistoryView
+                  history={scanHistory}
+                  onSelectFood={(f) => {
+                    setActiveFoodResult(f);
+                    setActiveView('food_result');
+                  }}
+                  onSelectReport={(r) => {
+                    setActiveReportResult(r);
+                    setActiveView('report_result');
+                  }}
+                  onClearHistory={handleClearHistory}
+                  onStartFoodScan={() => setActiveView('food_camera')}
+                  onStartReportScan={() => setActiveView('report_scanner')}
+                  profile={profile}
+                />
+              )}
+
+              {activeTab === 'profile' && (
+                <ProfileView
+                  profile={profile}
+                  onUpdateProfile={(updated) => setProfile(updated)}
+                />
+              )}
+            </motion.div>
+          )}
+        </AnimatePresence>
       </main>
 
-      {/* Floating Glassmorphic Bottom Navigation */}
+      {/* Floating Bottom Navigation */}
       {activeView === 'main' && (
         <BottomNav
           activeTab={activeTab}

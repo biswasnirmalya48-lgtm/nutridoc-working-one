@@ -1,6 +1,12 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { ReportAnalysisResult, UserProfile } from '../../types';
-import { ArrowLeft, AlertTriangle, CheckCircle2, AlertCircle, FileText, Stethoscope } from 'lucide-react';
+import {
+  ArrowLeft,
+  Volume2,
+  VolumeX,
+  Check,
+  AlertCircle,
+} from 'lucide-react';
 
 interface ReportResultViewProps {
   result: ReportAnalysisResult;
@@ -18,33 +24,64 @@ export const ReportResultView: React.FC<ReportResultViewProps> = ({
   const isHindi = profile.language === 'hi';
   const isBengali = profile.language === 'bn';
 
+  const [isSpeaking, setIsSpeaking] = useState(false);
+  const [checkedDoses, setCheckedDoses] = useState<Record<string, boolean>>({});
+
+  const toggleDose = (key: string) => {
+    setCheckedDoses((prev) => ({ ...prev, [key]: !prev[key] }));
+  };
+
+  const handleToggleSpeak = () => {
+    if (!('speechSynthesis' in window)) return;
+    if (isSpeaking) {
+      window.speechSynthesis.cancel();
+      setIsSpeaking(false);
+      return;
+    }
+
+    const medText = (result.medicineNotes || [])
+      .map((m) => `${m.medicineName}: ${m.writtenInstruction}`)
+      .join('. ');
+    const labText = (result.items || [])
+      .map((i) => `${i.name}: ${i.result}, ${i.status}. ${i.simpleMeaning}`)
+      .join('. ');
+
+    const textToSpeak = `Summary: ${result.summary}. ${medText} ${labText}`;
+    const utterance = new SpeechSynthesisUtterance(textToSpeak);
+    utterance.rate = 0.95;
+    utterance.onend = () => setIsSpeaking(false);
+    utterance.onerror = () => setIsSpeaking(false);
+    setIsSpeaking(true);
+    window.speechSynthesis.speak(utterance);
+  };
+
   // Badge styling for lab report items
   const getItemStatusBadge = (status: string) => {
     switch (status) {
       case 'Normal':
         return {
-          bg: 'bg-emerald-50 text-emerald-800 border-emerald-200',
-          dot: 'bg-emerald-500',
+          pillClass: 'bg-emerald-50/80 text-emerald-800 border-emerald-300/60 liquid-glass-tag',
+          dotClass: 'bg-emerald-500',
           label: isHindi ? 'सामान्य' : isBengali ? 'স্বাভাবিক' : 'Normal',
         };
       case 'High':
         return {
-          bg: 'bg-rose-50 text-rose-800 border-rose-200',
-          dot: 'bg-rose-500',
-          label: isHindi ? 'सीमा से अधिक' : isBengali ? 'বেশি' : 'Above range',
+          pillClass: 'bg-rose-50/85 text-rose-900 border-rose-300/60 liquid-glass-tag',
+          dotClass: 'bg-rose-500',
+          label: isHindi ? 'अधिक' : isBengali ? 'বেশি' : 'High',
         };
       case 'Low':
         return {
-          bg: 'bg-amber-50 text-amber-800 border-amber-200',
-          dot: 'bg-amber-500',
-          label: isHindi ? 'सीमा से कम' : isBengali ? 'কম' : 'Below range',
+          pillClass: 'bg-amber-50/85 text-amber-900 border-amber-300/60 liquid-glass-tag',
+          dotClass: 'bg-amber-500',
+          label: isHindi ? 'कम' : isBengali ? 'কম' : 'Low',
         };
       case 'Needs Review':
       default:
         return {
-          bg: 'bg-neutral-100 text-[#1D1D1F] border-neutral-200',
-          dot: 'bg-neutral-500',
-          label: isHindi ? 'डॉक्टर से समीक्षा' : isBengali ? 'পর্যালোচনা প্রয়োজন' : 'Needs Review',
+          pillClass: 'bg-[#F0EFEA] text-[#161616] border-black/[0.06]',
+          dotClass: 'bg-[#737373]',
+          label: isHindi ? 'समीक्षा' : isBengali ? 'পর্যালোচনা' : 'Review',
         };
     }
   };
@@ -52,38 +89,58 @@ export const ReportResultView: React.FC<ReportResultViewProps> = ({
   const isPrescription = result.documentType === 'Prescription';
 
   return (
-    <div className="space-y-6 pb-24 animate-fade-in">
-      {/* Top Bar Navigation */}
+    <div className="space-y-6 pb-24">
+      {/* Top Floating Navigation */}
       <div className="flex items-center justify-between pt-1">
         <button
           onClick={onBack}
-          className="flex items-center gap-1.5 text-xs font-semibold text-[#1D1D1F] hover:text-black py-1.5 px-3 rounded-full bg-white border border-black/[0.06] shadow-2xs active:scale-95 transition-all"
+          className="flex items-center gap-1.5 text-xs font-medium text-[#161616] hover:text-black py-1.5 px-3 rounded-full liquid-glass-capsule liquid-ripple active:scale-[0.98] transition-all"
         >
-          <ArrowLeft className="w-4 h-4" />
+          <ArrowLeft className="w-3.5 h-3.5" />
           <span>{isHindi ? 'वापस' : isBengali ? 'পেছনে' : 'Home'}</span>
         </button>
 
-        <button
-          onClick={onScanAnother}
-          className="text-xs font-semibold text-blue-700 hover:text-blue-800 py-1.5 px-3 rounded-full bg-blue-50 border border-blue-100 shadow-2xs active:scale-95 transition-all"
-        >
-          {isHindi ? 'नया दस्तावेज़' : isBengali ? 'নতুন ডকুমেন্ট' : 'Scan Another'}
-        </button>
+        <div className="flex items-center gap-2">
+          {/* Read aloud action */}
+          <button
+            onClick={handleToggleSpeak}
+            className={`flex items-center gap-1.5 text-xs font-medium py-1.5 px-3 rounded-full liquid-glass-capsule liquid-ripple active:scale-[0.98] transition-all ${
+              isSpeaking
+                ? 'bg-rose-50/90 text-rose-800 border-rose-200'
+                : 'text-[#161616]'
+            }`}
+            title="Read summary"
+          >
+            {isSpeaking ? (
+              <VolumeX className="w-3.5 h-3.5 text-rose-600" />
+            ) : (
+              <Volume2 className="w-3.5 h-3.5 text-[#737373]" />
+            )}
+            <span>{isSpeaking ? 'Stop' : isHindi ? 'सुनें' : 'Listen'}</span>
+          </button>
+
+          <button
+            onClick={onScanAnother}
+            className="text-xs font-medium text-[#161616] py-1.5 px-3 rounded-full bg-[#F0EFEA] hover:bg-[#EAE9E4] liquid-ripple active:scale-[0.98] transition-all"
+          >
+            {isHindi ? 'नया दस्तावेज़' : isBengali ? 'নতুন স্ক্যান' : 'Scan Another'}
+          </button>
+        </div>
       </div>
 
       {/* Main Document Summary Card */}
-      <div className="bg-white rounded-3xl p-6 border border-black/[0.06] shadow-[0_4px_24px_rgba(0,0,0,0.03)] space-y-4">
-        {/* Document Type Header */}
+      <div className="bg-white rounded-[24px] p-6 border border-black/[0.06] shadow-[0_2px_16px_rgba(0,0,0,0.03)] space-y-4">
+        {/* Document Header */}
         <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <span className="w-8 h-8 rounded-xl bg-blue-50 text-blue-700 flex items-center justify-center font-bold text-xs">
+          <div className="flex items-center gap-3">
+            <span className="w-10 h-10 rounded-2xl bg-[#F0EFEA] text-[#161616] flex items-center justify-center font-bold text-xs">
               {isPrescription ? 'Rx' : 'Lab'}
             </span>
             <div>
-              <h2 className="text-base font-bold text-[#1D1D1F]">
+              <h2 className="text-base font-bold text-[#161616]">
                 {result.documentType}
               </h2>
-              <p className="text-[10px] text-[#86868B]">
+              <p className="text-xs text-[#737373]">
                 {new Date(result.timestamp).toLocaleDateString(undefined, {
                   month: 'short',
                   day: 'numeric',
@@ -92,75 +149,70 @@ export const ReportResultView: React.FC<ReportResultViewProps> = ({
               </p>
             </div>
           </div>
-
-          <span className="text-[11px] font-semibold text-blue-700 bg-blue-50 px-2.5 py-1 rounded-full border border-blue-100">
-            {isHindi ? 'सरल भाषा' : isBengali ? 'সহজ ভাষা' : 'Plain Language'}
-          </span>
         </div>
 
         {/* Short Plain-Language Summary */}
-        <div className="p-4 rounded-2xl bg-[#F7F7F5] border border-black/[0.03] space-y-1">
-          <span className="text-[11px] font-semibold uppercase tracking-wider text-[#86868B] block">
-            {isHindi ? 'सार संक्षेप' : isBengali ? 'সংক্ষিপ্ত সার' : 'Summary'}
+        <div className="space-y-1 pt-1">
+          <span className="text-xs font-semibold text-[#161616] uppercase tracking-wider block">
+            {isHindi ? 'मुख्य सारांश' : isBengali ? 'সারসংক্ষেপ' : 'Summary'}
           </span>
-          <p className="text-sm text-[#1D1D1F] leading-relaxed">
+          <p className="text-sm text-[#161616] leading-relaxed">
             {result.summary}
           </p>
         </div>
       </div>
 
-      {/* Lab Report Items (if Lab Report) */}
+      {/* Lab Report Items: Each test as a simple row */}
       {result.items && result.items.length > 0 && (
         <div className="space-y-3">
           <div className="px-1">
-            <h3 className="text-sm font-bold uppercase tracking-wider text-[#1D1D1F]">
-              {isHindi ? 'परीक्षण परिणाम (Test Results)' : isBengali ? 'পরীক্ষার ফলাফল' : 'Test Results'}
+            <h3 className="text-base font-bold text-[#161616]">
+              {isHindi ? 'जांच परिणाम' : isBengali ? 'টেস্ট ফলাফল' : 'Test results'}
             </h3>
-            <p className="text-xs text-[#86868B]">
-              {isHindi ? 'प्रत्येक टेस्ट का सरल अर्थ' : isBengali ? 'প্রতিটি টেস্টের সহজ অর্থ' : 'Short breakdown with reference ranges'}
+            <p className="text-xs text-[#737373]">
+              {isHindi ? 'परिणाम और उनका सरल अर्थ' : isBengali ? 'ফলাফল ও সহজ অর্থ' : 'Results and one-line meaning'}
             </p>
           </div>
 
-          <div className="grid grid-cols-1 gap-3">
+          <div className="space-y-2">
             {result.items.map((item, index) => {
               const badge = getItemStatusBadge(item.status);
               return (
                 <div
                   key={index}
-                  className="bg-white rounded-2xl p-5 border border-black/[0.06] shadow-2xs space-y-2.5"
+                  className="bg-white rounded-[20px] p-4 border border-black/[0.06] shadow-[0_1px_6px_rgba(0,0,0,0.02)] space-y-2 transition-all hover:border-black/[0.12]"
                 >
-                  {/* Test Name & Status */}
-                  <div className="flex items-start justify-between gap-2">
-                    <h4 className="text-sm font-bold text-[#1D1D1F]">
+                  {/* Row: Name and Status */}
+                  <div className="flex items-center justify-between gap-2">
+                    <h4 className="text-sm font-semibold text-[#161616]">
                       {item.name}
                     </h4>
                     <span
-                      className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-semibold border ${badge.bg} shrink-0`}
+                      className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-medium border ${badge.pillClass}`}
                     >
-                      <span className={`w-1.5 h-1.5 rounded-full ${badge.dot}`} />
+                      <span className={`w-1.5 h-1.5 rounded-full ${badge.dotClass}`} />
                       {badge.label}
                     </span>
                   </div>
 
-                  {/* Result & Range */}
+                  {/* Result & Reference Range */}
                   <div className="flex items-center gap-4 text-xs">
                     <div>
-                      <span className="text-[#86868B] block text-[10px] uppercase font-semibold">Result</span>
-                      <span className="text-sm font-extrabold text-[#1D1D1F]">{item.result}</span>
+                      <span className="text-[#737373] text-[11px] block">Result</span>
+                      <span className="text-sm font-bold text-[#161616]">{item.result}</span>
                     </div>
                     {item.range && (
-                      <div className="border-l border-black/10 pl-4">
-                        <span className="text-[#86868B] block text-[10px] uppercase font-semibold">Reference Range</span>
-                        <span className="text-xs font-medium text-[#505054]">{item.range}</span>
+                      <div className="border-l border-black/[0.06] pl-4">
+                        <span className="text-[#737373] text-[11px] block">Normal range</span>
+                        <span className="text-xs text-[#161616]">{item.range}</span>
                       </div>
                     )}
                   </div>
 
-                  {/* Simple Meaning */}
-                  <div className="pt-2 border-t border-black/[0.04] text-xs text-[#505054] leading-relaxed">
-                    <span className="font-semibold text-[#1D1D1F]">Meaning: </span>
-                    <span>{item.simpleMeaning}</span>
-                  </div>
+                  {/* One-Line Meaning */}
+                  <p className="text-xs text-[#737373] leading-relaxed pt-1 border-t border-black/[0.04]">
+                    {item.simpleMeaning}
+                  </p>
                 </div>
               );
             })}
@@ -168,56 +220,82 @@ export const ReportResultView: React.FC<ReportResultViewProps> = ({
         </div>
       )}
 
-      {/* Prescription Medicine Notes (if Prescription) */}
+      {/* Prescription Medicines & Schedule */}
       {result.medicineNotes && result.medicineNotes.length > 0 && (
         <div className="space-y-3">
-          <div className="px-1">
-            <h3 className="text-sm font-bold uppercase tracking-wider text-[#1D1D1F]">
-              {isHindi ? 'दवाइयाँ व निर्देश' : isBengali ? 'ওষুধ ও নিয়মাবলী' : 'Medicines & Instructions'}
-            </h3>
-            <p className="text-xs text-[#86868B]">
-              {isHindi ? 'सेवन का समय व सावधानी' : isBengali ? 'খাওয়ার সময় ও সতর্কতা' : 'Timing and pharmacist safety warnings'}
-            </p>
+          <div className="px-1 flex items-center justify-between">
+            <div>
+              <h3 className="text-base font-bold text-[#161616]">
+                {isHindi ? 'दवाइयाँ व नियम' : isBengali ? 'ওষুধ ও নিয়মাবলী' : 'Medicines & schedule'}
+              </h3>
+              <p className="text-xs text-[#737373]">
+                {isHindi ? 'खुराक और समय' : isBengali ? 'ওষুধ খাওয়ার সময়' : 'Dosage instructions'}
+              </p>
+            </div>
           </div>
 
-          <div className="grid grid-cols-1 gap-3">
+          <div className="space-y-2.5">
             {result.medicineNotes.map((med, index) => {
-              const isLowOrMed = med.confidence === 'Low' || med.confidence === 'Medium';
+              const isUnclear = med.confidence === 'Low' || med.confidence === 'Medium';
+              const doseKeys = ['Morning', 'Afternoon', 'Night'];
+
               return (
                 <div
                   key={index}
-                  className="bg-white rounded-2xl p-5 border border-black/[0.06] shadow-2xs space-y-2.5"
+                  className="bg-white rounded-[22px] p-5 border border-black/[0.06] shadow-[0_1px_8px_rgba(0,0,0,0.02)] space-y-3 transition-all hover:border-black/[0.12]"
                 >
-                  <div className="flex items-start justify-between gap-2">
-                    <h4 className="text-sm font-bold text-[#1D1D1F]">
+                  <div className="flex items-center justify-between gap-2">
+                    <h4 className="text-base font-semibold text-[#161616]">
                       {med.medicineName}
                     </h4>
-                    <span
-                      className={`text-[10px] font-semibold px-2 py-0.5 rounded-full border ${
-                        med.confidence === 'High'
-                          ? 'bg-emerald-50 text-emerald-800 border-emerald-200'
-                          : 'bg-amber-50 text-amber-800 border-amber-200'
-                      }`}
-                    >
-                      Confidence: {med.confidence}
-                    </span>
+
+                    {/* Subtle amber liquid-glass tag for unclear handwriting */}
+                    {isUnclear ? (
+                      <span className="inline-flex items-center gap-1 text-[11px] font-medium text-amber-900 bg-amber-50/85 px-2.5 py-0.5 rounded-full border border-amber-300/60 liquid-glass-tag shadow-2xs">
+                        <AlertCircle className="w-3 h-3 text-amber-700" />
+                        <span>Needs confirmation</span>
+                      </span>
+                    ) : (
+                      <span className="text-[11px] font-medium text-emerald-800 bg-emerald-50/85 px-2.5 py-0.5 rounded-full border border-emerald-300/60 liquid-glass-tag">
+                        Clear
+                      </span>
+                    )}
                   </div>
 
-                  {/* Written instruction */}
-                  <div className="text-xs text-[#1D1D1F]">
-                    <span className="font-semibold text-[#86868B] block text-[10px] uppercase">Written instruction</span>
-                    <span className="font-medium text-sm mt-0.5 block">“{med.writtenInstruction}”</span>
+                  {/* One-Line Instruction */}
+                  <div className="bg-[#F7F7F5] p-3 rounded-2xl">
+                    <p className="text-xs text-[#161616] leading-relaxed">
+                      {med.writtenInstruction}
+                    </p>
                   </div>
 
-                  {/* Warning banner for handwriting uncertainty */}
+                  {/* Gentle Daily Dose Tracker */}
+                  <div className="flex items-center gap-2 pt-0.5">
+                    {doseKeys.map((dose) => {
+                      const key = `${med.medicineName}_${dose}`;
+                      const isDone = !!checkedDoses[key];
+                      return (
+                        <button
+                          key={dose}
+                          onClick={() => toggleDose(key)}
+                          className={`flex-1 flex items-center justify-center gap-1.5 py-2 rounded-xl text-xs font-medium transition-all liquid-ripple active:scale-[0.98] ${
+                            isDone
+                              ? 'bg-[#161616] text-white'
+                              : 'bg-[#F0EFEA] text-[#737373] hover:text-[#161616]'
+                          }`}
+                        >
+                          <Check className={`w-3.5 h-3.5 ${isDone ? 'stroke-[2.5]' : 'opacity-30'}`} />
+                          <span>{dose}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
+
+                  {/* Warning Note if needed */}
                   {med.warning && (
-                    <div className="flex items-start gap-2 p-3 rounded-xl bg-amber-50/80 border border-amber-200 text-xs text-amber-900 leading-snug">
-                      <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
-                      <div>
-                        <span className="font-bold block">Pharmacist confirmation required:</span>
-                        <span>{med.warning}</span>
-                      </div>
-                    </div>
+                    <p className="text-xs text-amber-900 bg-amber-50/90 p-2.5 rounded-xl border border-amber-200/80">
+                      {med.warning}
+                    </p>
                   )}
                 </div>
               );
@@ -226,23 +304,11 @@ export const ReportResultView: React.FC<ReportResultViewProps> = ({
         </div>
       )}
 
-      {/* Next Step Card */}
-      {result.nextStep && (
-        <div className="bg-white rounded-2xl p-5 border border-black/[0.06] shadow-2xs space-y-1">
-          <div className="flex items-center gap-1.5 text-xs font-bold text-[#1D1D1F]">
-            <Stethoscope className="w-4 h-4 text-blue-600" />
-            <span>{isHindi ? 'अगला कदम' : isBengali ? 'পরবর্তী পদক্ষেপ' : 'Recommended Next Step'}</span>
-          </div>
-          <p className="text-xs text-[#505054] leading-relaxed">
-            {result.nextStep}
-          </p>
-        </div>
-      )}
-
-      {/* Quiet Safety Disclaimer */}
-      <div className="pt-4 text-center px-4">
-        <p className="text-[11px] text-[#86868B] leading-relaxed">
-          {result.disclaimer || 'NutriDoc provides general awareness only. It does not diagnose illness or replace a doctor or pharmacist.'}
+      {/* Safety Disclaimer */}
+      <div className="pt-2 text-center px-4">
+        <p className="text-xs text-[#737373] leading-relaxed">
+          {result.disclaimer ||
+            'NutriDoc is for everyday awareness. Always verify your prescription with your doctor or pharmacist.'}
         </p>
       </div>
     </div>

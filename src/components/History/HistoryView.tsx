@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { motion } from 'motion/react';
 import { FoodAnalysisResult, ReportAnalysisResult, ScanHistoryItem, UserProfile } from '../../types';
 import { History, Trash2, ArrowRight, ShieldCheck, FileText, Camera } from 'lucide-react';
 
@@ -57,32 +58,40 @@ export const HistoryView: React.FC<HistoryViewProps> = ({
         )}
       </div>
 
-      {/* Filter Tabs */}
-      <div className="flex gap-1.5 p-1 bg-black/[0.04] rounded-full border border-black/[0.02]">
-        <button
-          onClick={() => setFilter('all')}
-          className={`flex-1 py-1 text-xs font-semibold rounded-full transition-all ${
-            filter === 'all' ? 'bg-white text-black shadow-xs' : 'text-[#86868B] hover:text-black'
-          }`}
-        >
-          {isHindi ? 'सभी' : isBengali ? 'সব' : 'All'} ({history.length})
-        </button>
-        <button
-          onClick={() => setFilter('food')}
-          className={`flex-1 py-1 text-xs font-semibold rounded-full transition-all ${
-            filter === 'food' ? 'bg-white text-black shadow-xs' : 'text-[#86868B] hover:text-black'
-          }`}
-        >
-          {isHindi ? 'खाद्य' : isBengali ? 'খাদ্য' : 'Food'} ({history.filter((h) => h.type === 'food').length})
-        </button>
-        <button
-          onClick={() => setFilter('report')}
-          className={`flex-1 py-1 text-xs font-semibold rounded-full transition-all ${
-            filter === 'report' ? 'bg-white text-black shadow-xs' : 'text-[#86868B] hover:text-black'
-          }`}
-        >
-          {isHindi ? 'रिपोर्ट / पर्चा' : isBengali ? 'রিপোর্ট' : 'Reports'} ({history.filter((h) => h.type === 'report').length})
-        </button>
+      {/* Filter Tabs with Liquid Sliding Capsule */}
+      <div className="relative flex gap-1 p-1 liquid-glass-capsule rounded-full">
+        {(['all', 'food', 'report'] as const).map((tabKey) => {
+          const isSelected = filter === tabKey;
+          const label =
+            tabKey === 'all'
+              ? `${isHindi ? 'सभी' : isBengali ? 'সব' : 'All'} (${history.length})`
+              : tabKey === 'food'
+              ? `${isHindi ? 'खाद्य' : isBengali ? 'খাদ্য' : 'Food'} (${history.filter((h) => h.type === 'food').length})`
+              : `${isHindi ? 'रिपोर्ट' : isBengali ? 'রিপোর্ট' : 'Reports'} (${history.filter((h) => h.type === 'report').length})`;
+
+          return (
+            <button
+              key={tabKey}
+              onClick={() => setFilter(tabKey)}
+              className="relative flex-1 py-1.5 text-xs font-semibold rounded-full transition-colors z-10 liquid-ripple"
+            >
+              {isSelected && (
+                <motion.div
+                  layoutId="activeHistoryFilter"
+                  className="absolute inset-0 rounded-full liquid-glass-active-pill"
+                  transition={{ type: 'spring', stiffness: 450, damping: 32 }}
+                />
+              )}
+              <span
+                className={`relative z-10 transition-colors duration-150 ${
+                  isSelected ? 'text-white' : 'text-[#737373] hover:text-[#161616]'
+                }`}
+              >
+                {label}
+              </span>
+            </button>
+          );
+        })}
       </div>
 
       {/* Empty State */}
@@ -138,17 +147,17 @@ export const HistoryView: React.FC<HistoryViewProps> = ({
                 <button
                   key={f.id || index}
                   onClick={() => onSelectFood(f)}
-                  className="w-full text-left bg-white rounded-2xl p-4 border border-black/[0.06] shadow-2xs hover:border-black/20 hover:bg-[#FAF9F6] active:scale-[0.99] transition-all flex items-center justify-between gap-3"
+                  className="w-full text-left bg-white rounded-[22px] p-4 border border-black/[0.06] shadow-[0_1px_6px_rgba(0,0,0,0.02)] flex items-center justify-between gap-3 active:scale-[0.985] transition-all hover:border-black/[0.12]"
                 >
                   <div className="flex items-center gap-3 min-w-0">
                     {f.imageUrl ? (
                       <img
                         src={f.imageUrl}
                         alt={f.productName}
-                        className="w-12 h-12 rounded-xl object-cover bg-black/5 shrink-0"
+                        className="w-12 h-12 rounded-2xl object-cover bg-black/5 shrink-0 border border-black/5"
                       />
                     ) : (
-                      <div className="w-12 h-12 rounded-xl bg-emerald-50 text-emerald-700 flex items-center justify-center font-bold text-xs shrink-0">
+                      <div className="w-12 h-12 rounded-2xl bg-[#F0EFEA] text-[#161616] flex items-center justify-center font-bold text-xs shrink-0">
                         Food
                       </div>
                     )}
@@ -157,14 +166,14 @@ export const HistoryView: React.FC<HistoryViewProps> = ({
                         <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full border ${statusPill}`}>
                           {f.status}
                         </span>
-                        <span className="text-[10px] text-[#86868B]">
+                        <span className="text-[10px] text-[#737373] font-medium">
                           Score: {f.healthScore}/100
                         </span>
                       </div>
-                      <h4 className="text-xs font-bold text-[#1D1D1F] truncate mt-1">
+                      <h4 className="text-xs font-semibold text-[#161616] truncate mt-1">
                         {f.productName}
                       </h4>
-                      <p className="text-[10px] text-[#86868B]">
+                      <p className="text-[10px] text-[#737373]">
                         {new Date(f.timestamp).toLocaleDateString(undefined, {
                           month: 'short',
                           day: 'numeric',
@@ -172,7 +181,9 @@ export const HistoryView: React.FC<HistoryViewProps> = ({
                       </p>
                     </div>
                   </div>
-                  <ArrowRight className="w-4 h-4 text-[#86868B] shrink-0" />
+                  <div className="w-8 h-8 rounded-full bg-[#F7F7F5] flex items-center justify-center text-[#737373] shrink-0">
+                    <ArrowRight className="w-4 h-4" />
+                  </div>
                 </button>
               );
             } else {
@@ -181,22 +192,22 @@ export const HistoryView: React.FC<HistoryViewProps> = ({
                 <button
                   key={r.id || index}
                   onClick={() => onSelectReport(r)}
-                  className="w-full text-left bg-white rounded-2xl p-4 border border-black/[0.06] shadow-2xs hover:border-black/20 hover:bg-[#FAF9F6] active:scale-[0.99] transition-all flex items-center justify-between gap-3"
+                  className="w-full text-left bg-white rounded-[22px] p-4 border border-black/[0.06] shadow-[0_1px_6px_rgba(0,0,0,0.02)] flex items-center justify-between gap-3 active:scale-[0.985] transition-all hover:border-black/[0.12]"
                 >
                   <div className="flex items-center gap-3 min-w-0">
-                    <div className="w-12 h-12 rounded-xl bg-blue-50 text-blue-700 flex items-center justify-center font-bold text-xs shrink-0">
+                    <div className="w-12 h-12 rounded-2xl bg-[#F0EFEA] text-[#161616] flex items-center justify-center font-bold text-xs shrink-0">
                       {r.documentType === 'Prescription' ? 'Rx' : 'Lab'}
                     </div>
                     <div className="min-w-0">
                       <div className="flex items-center gap-1.5">
-                        <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-blue-50 text-blue-800 border border-blue-100">
+                        <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-[#F0EFEA] text-[#161616]">
                           {r.documentType}
                         </span>
                       </div>
-                      <h4 className="text-xs font-bold text-[#1D1D1F] truncate mt-1">
+                      <h4 className="text-xs font-semibold text-[#161616] truncate mt-1">
                         {r.summary.slice(0, 45)}...
                       </h4>
-                      <p className="text-[10px] text-[#86868B]">
+                      <p className="text-[10px] text-[#737373]">
                         {new Date(r.timestamp).toLocaleDateString(undefined, {
                           month: 'short',
                           day: 'numeric',
@@ -204,7 +215,9 @@ export const HistoryView: React.FC<HistoryViewProps> = ({
                       </p>
                     </div>
                   </div>
-                  <ArrowRight className="w-4 h-4 text-[#86868B] shrink-0" />
+                  <div className="w-8 h-8 rounded-full bg-[#F7F7F5] flex items-center justify-center text-[#737373] shrink-0">
+                    <ArrowRight className="w-4 h-4" />
+                  </div>
                 </button>
               );
             }

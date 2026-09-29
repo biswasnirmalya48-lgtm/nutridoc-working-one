@@ -1,4 +1,5 @@
 import React from 'react';
+import { motion } from 'motion/react';
 import { UserProfile, Language } from '../../types';
 import { HeartPulse, ShieldAlert, Globe, User, Check } from 'lucide-react';
 
@@ -43,13 +44,13 @@ export const ProfileView: React.FC<ProfileViewProps> = ({ profile, onUpdateProfi
   };
 
   return (
-    <div className="space-y-6 pb-24 animate-fade-in">
+    <div className="space-y-6 pb-24">
       {/* Page Header */}
-      <div className="pt-1">
-        <h2 className="text-xl font-bold tracking-tight text-[#1D1D1F]">
+      <div className="pt-1 px-1">
+        <h2 className="text-xl font-bold tracking-tight text-[#161616]">
           {isHindi ? 'स्वास्थ्य प्रोफ़ाइल' : isBengali ? 'স্বাস্থ্য প্রোফাইল' : 'Health Profile'}
         </h2>
-        <p className="text-xs text-[#86868B]">
+        <p className="text-xs text-[#737373]">
           {isHindi
             ? 'आपके अनुसार व्यक्तिगत स्वास्थ्य स्कोर और चेतावनियां'
             : isBengali
@@ -58,67 +59,82 @@ export const ProfileView: React.FC<ProfileViewProps> = ({ profile, onUpdateProfi
         </p>
       </div>
 
-      {/* Language Selection Card */}
-      <div className="bg-white rounded-3xl p-5 border border-black/[0.06] shadow-xs space-y-3">
+      {/* Language Selection Card with Liquid Sliding Indicator */}
+      <div className="bg-white rounded-[24px] p-5 border border-black/[0.06] shadow-[0_2px_12px_rgba(0,0,0,0.03)] space-y-3">
         <div className="flex items-center gap-2">
-          <Globe className="w-4 h-4 text-[#1D1D1F]" />
-          <h3 className="text-xs font-bold uppercase tracking-wider text-[#1D1D1F]">
+          <Globe className="w-4 h-4 text-[#161616]" />
+          <h3 className="text-xs font-semibold uppercase tracking-wider text-[#161616]">
             {isHindi ? 'पसंदीदा भाषा' : isBengali ? 'পছন্দের ভাষা' : 'App Language'}
           </h3>
         </div>
 
-        <div className="grid grid-cols-3 gap-2">
+        <div className="grid grid-cols-3 gap-2 p-1 bg-[#F0EFEA] rounded-2xl relative">
           {[
             { id: 'en' as Language, label: 'English' },
-            { id: 'hi' as Language, label: 'हिंदी (Hindi)' },
-            { id: 'bn' as Language, label: 'বাংলা (Bengali)' },
-          ].map((l) => (
-            <button
-              key={l.id}
-              onClick={() => onUpdateProfile({ ...profile, language: l.id })}
-              className={`py-2 px-3 rounded-2xl text-xs font-semibold border transition-all text-center ${
-                profile.language === l.id
-                  ? 'bg-black text-white border-black shadow-xs'
-                  : 'bg-[#F7F7F5] text-[#1D1D1F] border-black/[0.04] hover:bg-black/5'
-              }`}
-            >
-              {l.label}
-            </button>
-          ))}
+            { id: 'hi' as Language, label: 'हिंदी' },
+            { id: 'bn' as Language, label: 'বাংলা' },
+          ].map((l) => {
+            const isSelected = profile.language === l.id;
+            return (
+              <button
+                key={l.id}
+                onClick={() => onUpdateProfile({ ...profile, language: l.id })}
+                className="relative py-2.5 px-3 rounded-xl text-xs font-semibold transition-all text-center liquid-ripple z-10"
+              >
+                {isSelected && (
+                  <motion.div
+                    layoutId="activeProfileLangCapsule"
+                    className="absolute inset-0 rounded-xl bg-white shadow-xs border border-black/[0.04]"
+                    transition={{ type: 'spring', stiffness: 450, damping: 32 }}
+                  />
+                )}
+                <span
+                  className={`relative z-10 transition-colors ${
+                    isSelected ? 'text-[#161616]' : 'text-[#737373] hover:text-[#161616]'
+                  }`}
+                >
+                  {l.label}
+                </span>
+              </button>
+            );
+          })}
         </div>
       </div>
 
-      {/* Age Group Card */}
-      <div className="bg-white rounded-3xl p-5 border border-black/[0.06] shadow-xs space-y-3">
+      {/* Age Group Card with Liquid Sliding Pill */}
+      <div className="bg-white rounded-[24px] p-5 border border-black/[0.06] shadow-[0_2px_12px_rgba(0,0,0,0.03)] space-y-3">
         <div className="flex items-center gap-2">
-          <User className="w-4 h-4 text-[#1D1D1F]" />
-          <h3 className="text-xs font-bold uppercase tracking-wider text-[#1D1D1F]">
+          <User className="w-4 h-4 text-[#161616]" />
+          <h3 className="text-xs font-semibold uppercase tracking-wider text-[#161616]">
             {isHindi ? 'आयु वर्ग' : isBengali ? 'বয়স সীমা' : 'Age Range'}
           </h3>
         </div>
 
         <div className="flex flex-wrap gap-2">
-          {ageRanges.map((age) => (
-            <button
-              key={age}
-              onClick={() => onUpdateProfile({ ...profile, ageRange: age })}
-              className={`py-1.5 px-3.5 rounded-full text-xs font-semibold border transition-all ${
-                profile.ageRange === age
-                  ? 'bg-black text-white border-black shadow-xs'
-                  : 'bg-[#F7F7F5] text-[#1D1D1F] border-black/[0.04] hover:bg-black/5'
-              }`}
-            >
-              {age}
-            </button>
-          ))}
+          {ageRanges.map((age) => {
+            const isSelected = profile.ageRange === age;
+            return (
+              <button
+                key={age}
+                onClick={() => onUpdateProfile({ ...profile, ageRange: age })}
+                className={`relative py-1.5 px-3.5 rounded-full text-xs font-semibold transition-all liquid-ripple ${
+                  isSelected
+                    ? 'bg-[#161616] text-white shadow-xs'
+                    : 'bg-[#F0EFEA] text-[#161616] hover:bg-[#EAE9E4]'
+                }`}
+              >
+                {age}
+              </button>
+            );
+          })}
         </div>
       </div>
 
       {/* Health Conditions Toggles */}
-      <div className="bg-white rounded-3xl p-5 border border-black/[0.06] shadow-xs space-y-3">
+      <div className="bg-white rounded-[24px] p-5 border border-black/[0.06] shadow-[0_2px_12px_rgba(0,0,0,0.03)] space-y-3">
         <div className="flex items-center gap-2">
           <HeartPulse className="w-4 h-4 text-emerald-600" />
-          <h3 className="text-xs font-bold uppercase tracking-wider text-[#1D1D1F]">
+          <h3 className="text-xs font-semibold uppercase tracking-wider text-[#161616]">
             {isHindi ? 'स्वास्थ्य स्थितियां' : isBengali ? 'শারীরিক অবস্থা' : 'Health Conditions'}
           </h3>
         </div>
@@ -151,15 +167,15 @@ export const ProfileView: React.FC<ProfileViewProps> = ({ profile, onUpdateProfi
               <button
                 key={cond.key}
                 onClick={() => toggleCondition(cond.key)}
-                className={`w-full text-left p-3.5 rounded-2xl border transition-all flex items-center justify-between gap-3 ${
+                className={`w-full text-left p-3.5 rounded-2xl border transition-all flex items-center justify-between gap-3 liquid-ripple ${
                   active
                     ? 'bg-emerald-50/70 border-emerald-300 shadow-2xs'
-                    : 'bg-[#F7F7F5] border-black/[0.04] hover:bg-black/5'
+                    : 'bg-[#F7F7F5] border-black/[0.04] hover:border-black/[0.1]'
                 }`}
               >
                 <div className="space-y-0.5">
-                  <h4 className="text-xs font-bold text-[#1D1D1F]">{cond.title}</h4>
-                  <p className="text-[11px] text-[#86868B]">{cond.desc}</p>
+                  <h4 className="text-xs font-semibold text-[#161616]">{cond.title}</h4>
+                  <p className="text-[11px] text-[#737373]">{cond.desc}</p>
                 </div>
                 <div
                   className={`w-6 h-6 rounded-full flex items-center justify-center shrink-0 transition-colors ${
@@ -175,14 +191,14 @@ export const ProfileView: React.FC<ProfileViewProps> = ({ profile, onUpdateProfi
       </div>
 
       {/* Allergies Card */}
-      <div className="bg-white rounded-3xl p-5 border border-black/[0.06] shadow-xs space-y-3">
+      <div className="bg-white rounded-[24px] p-5 border border-black/[0.06] shadow-[0_2px_12px_rgba(0,0,0,0.03)] space-y-3">
         <div className="flex items-center gap-2">
           <ShieldAlert className="w-4 h-4 text-rose-600" />
-          <h3 className="text-xs font-bold uppercase tracking-wider text-[#1D1D1F]">
+          <h3 className="text-xs font-semibold uppercase tracking-wider text-[#161616]">
             {isHindi ? 'एलर्जी सावधानियां' : isBengali ? 'অ্যালার্জি' : 'Food Allergies'}
           </h3>
         </div>
-        <p className="text-[11px] text-[#86868B]">
+        <p className="text-[11px] text-[#737373]">
           {isHindi ? 'पैकेट सामग्री में पाए जाने पर तत्काल चेतावनी दी जाएगी' : isBengali ? 'উপাদান তালিকায় থাকলে লাল সতর্কতা প্রদর্শন করা হবে' : 'Immediate red warning if detected in scanned ingredients'}
         </p>
 
@@ -193,10 +209,10 @@ export const ProfileView: React.FC<ProfileViewProps> = ({ profile, onUpdateProfi
               <button
                 key={allergy}
                 onClick={() => toggleAllergy(allergy)}
-                className={`py-1.5 px-3.5 rounded-full text-xs font-semibold border transition-all ${
+                className={`py-1.5 px-3.5 rounded-full text-xs font-semibold border transition-all liquid-ripple ${
                   isSelected
-                    ? 'bg-rose-50 text-rose-800 border-rose-300 shadow-xs'
-                    : 'bg-[#F7F7F5] text-[#1D1D1F] border-black/[0.04] hover:bg-black/5'
+                    ? 'bg-rose-50 text-rose-900 border-rose-300 shadow-xs'
+                    : 'bg-[#F0EFEA] text-[#161616] border-black/[0.04] hover:bg-[#EAE9E4]'
                 }`}
               >
                 {allergy}

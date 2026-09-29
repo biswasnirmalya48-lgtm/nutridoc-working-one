@@ -1,6 +1,6 @@
 import React from 'react';
+import { motion } from 'motion/react';
 import { Language, UserProfile } from '../types';
-import { Sparkles, Globe, HeartPulse } from 'lucide-react';
 
 interface HeaderProps {
   profile: UserProfile;
@@ -28,57 +28,62 @@ export const Header: React.FC<HeaderProps> = ({ profile, onUpdateLanguage, onOpe
     });
 
   return (
-    <header className="sticky top-0 z-40 bg-[#F7F7F5]/90 backdrop-blur-md border-b border-black/[0.04] transition-all">
-      <div className="max-w-md mx-auto px-4 h-14 flex items-center justify-between">
+    <div className="sticky top-2.5 z-40 w-full max-w-md mx-auto px-3.5 pointer-events-none">
+      <header className="pointer-events-auto liquid-glass-nav rounded-[22px] px-3.5 h-13 flex items-center justify-between transition-all">
         {/* Brand */}
         <div className="flex items-center gap-2">
-          <div className="w-8 h-8 rounded-xl bg-black text-white flex items-center justify-center shadow-xs">
-            <span className="font-semibold text-sm tracking-tight text-white flex items-center">
-              N<span className="text-emerald-400 text-xs">●</span>
-            </span>
-          </div>
-          <div>
-            <h1 className="text-base font-semibold tracking-tight text-[#1D1D1F] leading-none">
-              NutriDoc
-            </h1>
-            <p className="text-[10px] text-[#86868B] font-medium tracking-wide">
-              {profile.language === 'hi' ? 'स्वास्थ्य मार्गदर्शक' : profile.language === 'bn' ? 'স্বাস্থ্য সহায়িকা' : 'Health & Nutrition'}
-            </p>
-          </div>
+          <span className="text-[15px] font-bold tracking-tight text-[#161616]">
+            NutriDoc
+          </span>
+          <span className="text-[11px] text-[#737373] font-normal hidden sm:inline">
+            {profile.language === 'hi' ? 'स्वास्थ्य मार्गदर्शक' : profile.language === 'bn' ? 'স্বাস্থ্য সহায়ক' : 'Everyday Health'}
+          </span>
         </div>
 
-        {/* Action Controls */}
-        <div className="flex items-center gap-2">
-          {/* Active Profile Health Tag */}
+        {/* Minimal Navigation Controls on the Right */}
+        <div className="flex items-center gap-1.5">
+          {/* Active Profile Health Pill with subtle refraction */}
           <button
             onClick={onOpenProfile}
-            className="flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-black/[0.04] text-[#1D1D1F] hover:bg-black/[0.07] transition-colors"
-            title="Active health profile"
+            className="relative liquid-ripple text-xs text-[#525252] hover:text-[#161616] px-2.5 py-1 rounded-full liquid-glass-capsule active:scale-95 transition-all flex items-center gap-1"
+            title="Edit health profile"
           >
-            <HeartPulse className="w-3.5 h-3.5 text-emerald-600" />
-            <span className="text-[11px]">
-              {activeConditions.length > 0 ? activeConditions.slice(0, 2).join(' • ') : profile.ageRange}
+            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500/80" />
+            <span className="font-medium text-[11px] max-w-[85px] truncate">
+              {activeConditions.length > 0 ? activeConditions.slice(0, 2).join(' · ') : profile.ageRange}
             </span>
           </button>
 
-          {/* Language Selector */}
-          <div className="flex items-center bg-black/[0.04] p-0.5 rounded-full border border-black/[0.02]">
-            {languages.map((l) => (
-              <button
-                key={l.code}
-                onClick={() => onUpdateLanguage(l.code)}
-                className={`text-[11px] font-semibold px-2 py-0.5 rounded-full transition-all ${
-                  profile.language === l.code
-                    ? 'bg-white text-black shadow-xs'
-                    : 'text-[#86868B] hover:text-black'
-                }`}
-              >
-                {l.label}
-              </button>
-            ))}
+          {/* Liquid Language Switcher with sliding capsule */}
+          <div className="relative flex items-center bg-black/[0.03] p-0.5 rounded-full border border-black/[0.04]">
+            {languages.map((l) => {
+              const isSelected = profile.language === l.code;
+              return (
+                <button
+                  key={l.code}
+                  onClick={() => onUpdateLanguage(l.code)}
+                  className="relative px-2 py-0.5 text-[11px] font-medium transition-colors z-10"
+                >
+                  {isSelected && (
+                    <motion.div
+                      layoutId="activeLangCapsule"
+                      className="absolute inset-0 rounded-full liquid-glass-capsule shadow-2xs"
+                      transition={{ type: 'spring', stiffness: 450, damping: 32 }}
+                    />
+                  )}
+                  <span
+                    className={`relative z-10 transition-colors duration-150 ${
+                      isSelected ? 'text-[#161616] font-semibold' : 'text-[#737373] hover:text-[#161616]'
+                    }`}
+                  >
+                    {l.label}
+                  </span>
+                </button>
+              );
+            })}
           </div>
         </div>
-      </div>
-    </header>
+      </header>
+    </div>
   );
 };

@@ -1,18 +1,16 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { motion } from 'motion/react';
 import { FoodAnalysisResult, UserProfile, BetterAlternative } from '../../types';
 import {
   ArrowLeft,
-  ShieldCheck,
   ArrowRightLeft,
   ChevronDown,
-  Sparkles,
-  Search,
   ExternalLink,
   Check,
-  Tag,
-  Apple,
-  TrendingUp,
   ShoppingBag,
+  Volume2,
+  VolumeX,
+  Package,
 } from 'lucide-react';
 
 interface FoodResultViewProps {
@@ -32,71 +30,117 @@ export const FoodResultView: React.FC<FoodResultViewProps> = ({
   const isBengali = profile.language === 'bn';
 
   // Interactive states
-  const [activeTab, setActiveTab] = useState<'all' | 'brand' | 'fresh'>('brand');
-  const [expandedAltIndex, setExpandedAltIndex] = useState<number | null>(0);
+  const [activeTab, setActiveTab] = useState<'brand' | 'fresh'>('brand');
+  const [expandedAltIndex, setExpandedAltIndex] = useState<number | null>(null);
   const [copiedIndex, setCopiedIndex] = useState<number | null>(null);
+  const [isSpeaking, setIsSpeaking] = useState(false);
 
-  // Status styling (Apple clean palette: Green, Amber, Red only)
-  const getStatusStyles = (status: string) => {
+  // Smooth Apple animated score counter
+  const [displayScore, setDisplayScore] = useState(0);
+
+  useEffect(() => {
+    let startTime: number | null = null;
+    const duration = 600;
+    const target = result.healthScore;
+
+    function step(timestamp: number) {
+      if (!startTime) startTime = timestamp;
+      const progress = Math.min((timestamp - startTime) / duration, 1);
+      const ease = 1 - Math.pow(1 - progress, 3);
+      setDisplayScore(Math.round(target * ease));
+
+      if (progress < 1) {
+        requestAnimationFrame(step);
+      }
+    }
+
+    requestAnimationFrame(step);
+    return () => {
+      if ('speechSynthesis' in window) {
+        window.speechSynthesis.cancel();
+      }
+    };
+  }, [result.healthScore]);
+
+  // Audio Speech Synthesis
+  const handleToggleSpeak = () => {
+    if (!('speechSynthesis' in window)) return;
+    if (isSpeaking) {
+      window.speechSynthesis.cancel();
+      setIsSpeaking(false);
+      return;
+    }
+
+    const textToSpeak = `${result.productName}. Health score ${result.healthScore} out of 100. Status: ${result.status}. Why it matters: ${result.simpleReason}. ${result.personalNote ? 'For you: ' + result.personalNote : ''}`;
+    const utterance = new SpeechSynthesisUtterance(textToSpeak);
+    utterance.rate = 0.95;
+    utterance.onend = () => setIsSpeaking(false);
+    utterance.onerror = () => setIsSpeaking(false);
+    setIsSpeaking(true);
+    window.speechSynthesis.speak(utterance);
+  };
+
+  // Status Styling: One small coloured glass pill
+  const getStatusConfig = (status: string) => {
     switch (status) {
       case 'Good Choice':
         return {
-          pillBg: 'bg-emerald-50 text-emerald-800 border-emerald-200',
-          dotBg: 'bg-emerald-500',
-          scoreColor: 'text-emerald-700',
-          ringBg: 'stroke-emerald-500',
           label: isHindi ? 'उत्तम विकल्प' : isBengali ? 'উত্তম পছন্দ' : 'Good Choice',
+          pillClass: 'bg-emerald-50/80 text-emerald-800 border-emerald-300/60 shadow-[0_1px_6px_rgba(16,185,129,0.12)]',
+          dotClass: 'bg-emerald-500',
+          scoreTextClass: 'text-emerald-700',
+          ringStroke: 'stroke-emerald-500',
         };
       case 'Limit':
         return {
-          pillBg: 'bg-amber-50 text-amber-800 border-amber-200',
-          dotBg: 'bg-amber-500',
-          scoreColor: 'text-amber-700',
-          ringBg: 'stroke-amber-500',
-          label: isHindi ? 'सीमित सेवन करें' : isBengali ? 'পরিমিত খান' : 'Limit',
+          label: isHindi ? 'सीमित सेवन' : isBengali ? 'পরিমিত খান' : 'Limit',
+          pillClass: 'bg-amber-50/85 text-amber-900 border-amber-300/60 shadow-[0_1px_6px_rgba(245,158,11,0.12)]',
+          dotClass: 'bg-amber-500',
+          scoreTextClass: 'text-amber-700',
+          ringStroke: 'stroke-amber-500',
         };
       case 'Avoid':
       default:
         return {
-          pillBg: 'bg-rose-50 text-rose-800 border-rose-200',
-          dotBg: 'bg-rose-500',
-          scoreColor: 'text-rose-700',
-          ringBg: 'stroke-rose-500',
           label: isHindi ? 'सेवन से बचें' : isBengali ? 'পরিহার করুন' : 'Avoid',
+          pillClass: 'bg-rose-50/85 text-rose-900 border-rose-300/60 shadow-[0_1px_6px_rgba(244,63,94,0.12)]',
+          dotClass: 'bg-rose-500',
+          scoreTextClass: 'text-rose-700',
+          ringStroke: 'stroke-rose-500',
         };
     }
   };
 
-  const getNutrientBadge = (level: 'Low' | 'Medium' | 'High', isPositiveNutrient: boolean = false) => {
-    if (!isPositiveNutrient) {
-      if (level === 'Low') return 'bg-emerald-50 text-emerald-800 border-emerald-100';
-      if (level === 'Medium') return 'bg-amber-50 text-amber-800 border-amber-100';
-      return 'bg-rose-50 text-rose-800 border-rose-100 font-semibold';
+  const statusConfig = getStatusConfig(result.status);
+  const strokeDashoffset = 283 - (283 * displayScore) / 100;
+
+  // Nutrient Pill Styling in Clean Simple Rows
+  const getNutrientStyle = (level: 'Low' | 'Medium' | 'High', isPositive: boolean) => {
+    if (!isPositive) {
+      if (level === 'Low') return 'bg-[#F0EFEA] text-[#161616]';
+      if (level === 'Medium') return 'bg-amber-50/90 text-amber-900 border border-amber-200/80 font-medium';
+      return 'bg-rose-50/90 text-rose-900 border border-rose-200/80 font-semibold';
     } else {
-      if (level === 'High') return 'bg-emerald-50 text-emerald-800 border-emerald-100 font-semibold';
-      if (level === 'Medium') return 'bg-neutral-100 text-[#1D1D1F] border-neutral-200';
-      return 'bg-neutral-100 text-[#86868B] border-neutral-200';
+      if (level === 'High') return 'bg-emerald-50/90 text-emerald-800 border border-emerald-200/80 font-medium';
+      return 'bg-[#F0EFEA] text-[#161616]';
     }
   };
 
-  const statusStyle = getStatusStyles(result.status);
-  const strokeDashoffset = 283 - (283 * result.healthScore) / 100;
-
-  // Filter alternatives based on selected tab
-  const filteredAlternatives = (result.betterAlternatives || []).filter((alt) => {
+  // Filter alternatives
+  const alternatives = result.betterAlternatives || [];
+  const filteredAlternatives = alternatives.filter((alt) => {
     if (activeTab === 'brand') return alt.type !== 'fresh';
     if (activeTab === 'fresh') return alt.type === 'fresh';
     return true;
   });
 
   const handleCopySearch = (alt: BetterAlternative, idx: number) => {
-    const searchQuery = `${alt.brand ? alt.brand + ' ' : ''}${alt.name}`;
-    navigator.clipboard?.writeText(searchQuery).catch(() => {});
+    const query = `${alt.brand ? alt.brand + ' ' : ''}${alt.name}`;
+    navigator.clipboard?.writeText(query).catch(() => {});
     setCopiedIndex(idx);
     setTimeout(() => setCopiedIndex(null), 2500);
 
-    // Also open Google Search / Quick commerce lookup in new tab cleanly
-    const url = `https://www.google.com/search?q=${encodeURIComponent(searchQuery + ' buy online')}`;
+    const url = `https://www.google.com/search?q=${encodeURIComponent(query + ' buy online')}`;
     try {
       window.open(url, '_blank', 'noopener,noreferrer');
     } catch {}
@@ -107,29 +151,54 @@ export const FoodResultView: React.FC<FoodResultViewProps> = ({
   };
 
   return (
-    <div className="space-y-6 pb-28 animate-slide-up">
-      {/* Top Bar Navigation */}
+    <div className="space-y-6 pb-24">
+      {/* Top Floating Glass Navigation */}
       <div className="flex items-center justify-between pt-1">
         <button
           onClick={onBack}
-          className="flex items-center gap-1.5 text-xs font-semibold text-[#1D1D1F] hover:text-black py-1.5 px-3 rounded-full bg-white border border-black/[0.06] shadow-2xs active:scale-95 transition-all"
+          className="flex items-center gap-1.5 text-xs font-medium text-[#161616] hover:text-black py-1.5 px-3 rounded-full liquid-glass-capsule liquid-ripple active:scale-[0.98] transition-all"
         >
-          <ArrowLeft className="w-4 h-4" />
+          <ArrowLeft className="w-3.5 h-3.5" />
           <span>{isHindi ? 'वापस' : isBengali ? 'পেছনে' : 'Home'}</span>
         </button>
 
-        <button
-          onClick={onScanAnother}
-          className="text-xs font-semibold text-emerald-700 hover:text-emerald-800 py-1.5 px-3 rounded-full bg-emerald-50 border border-emerald-100 shadow-2xs active:scale-95 transition-all"
-        >
-          {isHindi ? 'नया स्कैन' : isBengali ? 'নতুন স্ক্যান' : 'Scan Another'}
-        </button>
+        <div className="flex items-center gap-2">
+          {/* Calm Audio Speak Action */}
+          <button
+            onClick={handleToggleSpeak}
+            className={`flex items-center gap-1.5 text-xs font-medium py-1.5 px-3 rounded-full liquid-glass-capsule liquid-ripple active:scale-[0.98] transition-all ${
+              isSpeaking
+                ? 'bg-rose-50/90 text-rose-800 border-rose-200'
+                : 'text-[#161616]'
+            }`}
+            title="Read summary"
+          >
+            {isSpeaking ? (
+              <VolumeX className="w-3.5 h-3.5 text-rose-600" />
+            ) : (
+              <Volume2 className="w-3.5 h-3.5 text-[#737373]" />
+            )}
+            <span>{isSpeaking ? 'Stop' : isHindi ? 'सुनें' : 'Listen'}</span>
+          </button>
+
+          <button
+            onClick={onScanAnother}
+            className="text-xs font-medium text-[#161616] py-1.5 px-3 rounded-full bg-[#F0EFEA] hover:bg-[#EAE9E4] liquid-ripple active:scale-[0.98] transition-all"
+          >
+            {isHindi ? 'नया स्कैन' : isBengali ? 'নতুন স্ক্যান' : 'Scan Another'}
+          </button>
+        </div>
       </div>
 
-      {/* Main Scanned Product Card */}
-      <div className="bg-white rounded-3xl p-6 border border-black/[0.06] shadow-[0_4px_24px_rgba(0,0,0,0.03)] space-y-5">
-        {/* Scanned Product Image at top */}
-        <div className="relative w-full h-48 rounded-2xl overflow-hidden bg-black/5 flex items-center justify-center border border-black/[0.04]">
+      {/* Main Scanned Product Container (Clean Flat Spacious Card with soft depth) */}
+      <div className="bg-white rounded-[24px] p-6 border border-black/[0.06] shadow-[0_2px_16px_rgba(0,0,0,0.03)] space-y-6">
+        {/* Scanned Product Image is the Visual Hero (Staggered Soft Fade) */}
+        <motion.div
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.28, ease: [0.16, 1, 0.3, 1] }}
+          className="relative w-full h-56 rounded-[20px] overflow-hidden bg-[#F7F7F5] flex items-center justify-center border border-black/[0.04]"
+        >
           {result.imageUrl ? (
             <img
               src={result.imageUrl}
@@ -137,376 +206,328 @@ export const FoodResultView: React.FC<FoodResultViewProps> = ({
               className="w-full h-full object-cover"
             />
           ) : (
-            <div className="text-center p-4">
-              <span className="text-xs font-medium text-[#86868B]">Captured Product</span>
+            <div className="flex flex-col items-center gap-2 text-[#737373]">
+              <Package className="w-10 h-10 stroke-[1.5]" />
+              <span className="text-xs">Product Image</span>
             </div>
           )}
+        </motion.div>
 
-          {/* Status Overlay Badge */}
-          <div className="absolute top-3 right-3">
-            <span
-              className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold border backdrop-blur-md shadow-xs ${statusStyle.pillBg}`}
-            >
-              <span className={`w-2 h-2 rounded-full ${statusStyle.dotBg}`} />
-              {statusStyle.label}
-            </span>
-          </div>
-        </div>
-
-        {/* Product Name & Brand */}
-        <div>
+        {/* Product Name & Category */}
+        <motion.div
+          initial={{ opacity: 0, y: 8 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.28, delay: 0.08, ease: [0.16, 1, 0.3, 1] }}
+          className="space-y-0.5"
+        >
           {result.brand && (
-            <p className="text-xs uppercase font-semibold tracking-wider text-[#86868B]">
+            <p className="text-xs uppercase tracking-wider font-semibold text-[#737373]">
               {result.brand}
             </p>
           )}
-          <h2 className="text-xl font-bold tracking-tight text-[#1D1D1F]">
+          <h1 className="text-2xl font-bold tracking-tight text-[#161616]">
             {result.productName}
-          </h2>
-          <p className="text-xs text-[#86868B] mt-0.5">{result.category}</p>
-        </div>
+          </h1>
+          <p className="text-sm text-[#737373]">{result.category}</p>
+        </motion.div>
 
-        {/* Health Score Hero Strip */}
-        <div className="flex items-center justify-between p-4 rounded-2xl bg-[#F7F7F5] border border-black/[0.03]">
-          <div className="space-y-0.5">
-            <span className="text-[11px] font-semibold text-[#86868B] uppercase tracking-wider block">
-              {isHindi ? 'हेल्थ स्कोर' : isBengali ? 'হেলথ স্কোর' : 'Health Score'}
+        {/* Health Score & Small Coloured Glass Status Pill */}
+        <motion.div
+          initial={{ opacity: 0, y: 8 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.28, delay: 0.14, ease: [0.16, 1, 0.3, 1] }}
+          className="flex items-center justify-between pt-1 pb-1"
+        >
+          <div className="space-y-1.5">
+            <span className="text-xs font-medium text-[#737373]">
+              Health Score: {displayScore}/100
             </span>
-            <div className="flex items-baseline gap-1">
-              <span className={`text-3xl font-extrabold tracking-tight ${statusStyle.scoreColor}`}>
-                {result.healthScore}
+            <div>
+              {/* One small coloured glass pill */}
+              <span
+                className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold liquid-glass-tag border ${statusConfig.pillClass}`}
+              >
+                <span className={`w-1.5 h-1.5 rounded-full ${statusConfig.dotClass}`} />
+                {statusConfig.label}
               </span>
-              <span className="text-sm font-semibold text-[#86868B]">/ 100</span>
             </div>
           </div>
 
-          {/* Circular Progress Ring */}
+          {/* Minimal Apple Progress Ring with smooth animated fill */}
           <div className="relative w-14 h-14 flex items-center justify-center">
             <svg className="w-14 h-14 -rotate-90" viewBox="0 0 100 100">
               <circle
                 cx="50"
                 cy="50"
                 r="45"
-                className="stroke-black/10"
-                strokeWidth="8"
+                className="stroke-black/[0.06]"
+                strokeWidth="7"
                 fill="transparent"
               />
               <circle
                 cx="50"
                 cy="50"
                 r="45"
-                className={statusStyle.ringBg}
-                strokeWidth="8"
+                className={statusConfig.ringStroke}
+                strokeWidth="7"
                 fill="transparent"
                 strokeDasharray="283"
                 strokeDashoffset={strokeDashoffset}
                 strokeLinecap="round"
-                style={{ transition: 'stroke-dashoffset 1s ease-in-out' }}
+                style={{ transition: 'stroke-dashoffset 0.15s ease-out' }}
               />
             </svg>
-            <div className="absolute text-[10px] font-bold text-[#1D1D1F]">
-              {result.healthScore}%
+            <span className="absolute text-xs font-semibold text-[#161616]">
+              {displayScore}
+            </span>
+          </div>
+        </motion.div>
+
+        {/* Nutrition values in one clean horizontal row */}
+        <motion.div
+          initial={{ opacity: 0, y: 8 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.28, delay: 0.2, ease: [0.16, 1, 0.3, 1] }}
+          className="pt-2 border-t border-black/[0.04]"
+        >
+          <div className="grid grid-cols-5 gap-2 text-center">
+            <div className={`p-2.5 rounded-2xl ${getNutrientStyle(result.nutrition.sugar, false)}`}>
+              <span className="text-[11px] text-[#737373] block">Sugar</span>
+              <span className="text-xs font-semibold block mt-0.5">{result.nutrition.sugar}</span>
+            </div>
+            <div className={`p-2.5 rounded-2xl ${getNutrientStyle(result.nutrition.sodium, false)}`}>
+              <span className="text-[11px] text-[#737373] block">Salt</span>
+              <span className="text-xs font-semibold block mt-0.5">{result.nutrition.sodium}</span>
+            </div>
+            <div className={`p-2.5 rounded-2xl ${getNutrientStyle(result.nutrition.fat, false)}`}>
+              <span className="text-[11px] text-[#737373] block">Fat</span>
+              <span className="text-xs font-semibold block mt-0.5">{result.nutrition.fat}</span>
+            </div>
+            <div className={`p-2.5 rounded-2xl ${getNutrientStyle(result.nutrition.protein, true)}`}>
+              <span className="text-[11px] text-[#737373] block">Protein</span>
+              <span className="text-xs font-semibold block mt-0.5">{result.nutrition.protein}</span>
+            </div>
+            <div className={`p-2.5 rounded-2xl ${getNutrientStyle(result.nutrition.fibre, true)}`}>
+              <span className="text-[11px] text-[#737373] block">Fibre</span>
+              <span className="text-xs font-semibold block mt-0.5">{result.nutrition.fibre}</span>
             </div>
           </div>
-        </div>
+        </motion.div>
 
-        {/* Compact Nutrition Indicators */}
-        <div className="space-y-2">
-          <p className="text-[11px] font-bold uppercase tracking-wider text-[#86868B]">
-            {isHindi ? 'प्रमुख पोषण संकेतक' : isBengali ? 'মূল পুষ্টি উপাদান' : 'Nutrition Indicators'}
+        {/* Why it matters: One short sentence only */}
+        <div className="space-y-1.5 pt-2 border-t border-black/[0.04]">
+          <h3 className="text-xs font-semibold text-[#161616] uppercase tracking-wider">
+            {isHindi ? 'यह क्यों महत्वपूर्ण है' : isBengali ? 'কেন এটি গুরুত্বপূর্ণ' : 'Why it matters'}
+          </h3>
+          <p className="text-sm text-[#161616] leading-relaxed">
+            {result.simpleReason}
           </p>
-          <div className="grid grid-cols-5 gap-1.5 text-center">
-            <div className={`p-2 rounded-xl border ${getNutrientBadge(result.nutrition.sugar, false)}`}>
-              <span className="text-[10px] text-[#86868B] block">Sugar</span>
-              <span className="text-xs font-bold block mt-0.5">{result.nutrition.sugar}</span>
-            </div>
-            <div className={`p-2 rounded-xl border ${getNutrientBadge(result.nutrition.sodium, false)}`}>
-              <span className="text-[10px] text-[#86868B] block">Salt</span>
-              <span className="text-xs font-bold block mt-0.5">{result.nutrition.sodium}</span>
-            </div>
-            <div className={`p-2 rounded-xl border ${getNutrientBadge(result.nutrition.fat, false)}`}>
-              <span className="text-[10px] text-[#86868B] block">Fat</span>
-              <span className="text-xs font-bold block mt-0.5">{result.nutrition.fat}</span>
-            </div>
-            <div className={`p-2 rounded-xl border ${getNutrientBadge(result.nutrition.protein, true)}`}>
-              <span className="text-[10px] text-[#86868B] block">Protein</span>
-              <span className="text-xs font-bold block mt-0.5">{result.nutrition.protein}</span>
-            </div>
-            <div className={`p-2 rounded-xl border ${getNutrientBadge(result.nutrition.fibre, true)}`}>
-              <span className="text-[10px] text-[#86868B] block">Fibre</span>
-              <span className="text-xs font-bold block mt-0.5">{result.nutrition.fibre}</span>
-            </div>
-          </div>
         </div>
 
-        {/* Short Reasoning */}
-        <div className="space-y-2 pt-2 border-t border-black/[0.04]">
-          <div className="text-sm text-[#1D1D1F] leading-snug">
-            <span className="font-bold">{isHindi ? 'कारण: ' : isBengali ? 'কারণ: ' : 'Why: '}</span>
-            <span>{result.simpleReason}</span>
-          </div>
-
-          {result.personalNote && (
-            <div className="text-sm text-[#1D1D1F] leading-snug bg-amber-50/60 p-3 rounded-xl border border-amber-200/50">
-              <span className="font-bold text-amber-900">
-                {isHindi ? 'आपके लिए: ' : isBengali ? 'আপনার জন্য: ' : 'For you: '}
-              </span>
-              <span className="text-amber-900">{result.personalNote}</span>
-            </div>
-          )}
-        </div>
-
-        {/* Key Flags pills */}
-        {result.keyFlags && result.keyFlags.length > 0 && (
-          <div className="flex flex-wrap gap-1.5 pt-1">
-            {result.keyFlags.map((flag, idx) => (
-              <span
-                key={idx}
-                className="text-[11px] font-medium bg-black/[0.04] text-[#505054] px-2.5 py-0.5 rounded-full"
-              >
-                {flag}
-              </span>
-            ))}
+        {/* For you: One short personalised sentence only */}
+        {result.personalNote && (
+          <div className="space-y-1.5 pt-2 border-t border-black/[0.04]">
+            <h3 className="text-xs font-semibold text-[#161616] uppercase tracking-wider">
+              {isHindi ? 'आपके लिए' : isBengali ? 'আপনার জন্য' : 'For you'}
+            </h3>
+            <p className="text-sm text-[#161616] leading-relaxed">
+              {result.personalNote}
+            </p>
           </div>
         )}
       </div>
 
-      {/* Healthier Alternatives & Real Other Brand Swaps Section */}
-      <div className="space-y-4">
-        {/* Section Header */}
-        <div className="px-1 flex items-start justify-between">
+      {/* Better swaps Section */}
+      <div className="space-y-3.5 pt-2">
+        <div className="flex items-center justify-between px-1">
           <div>
-            <div className="flex items-center gap-1.5">
-              <Sparkles className="w-4 h-4 text-emerald-600" />
-              <h3 className="text-base font-bold tracking-tight text-[#1D1D1F]">
-                {isHindi
-                  ? 'अन्य ब्रांड्स के स्वस्थ विकल्प'
-                  : isBengali
-                  ? 'অন্যান্য ব্র্যান্ডের স্বাস্থ্যকর বিকল্প'
-                  : 'Healthier Brand Alternatives'}
-              </h3>
-            </div>
-            <p className="text-xs text-[#86868B] mt-0.5">
+            <h2 className="text-lg font-bold tracking-tight text-[#161616]">
+              {isHindi ? 'बेहतर विकल्प' : isBengali ? 'স্বাস্থ্যকর বিকল্প' : 'Better swaps'}
+            </h2>
+            <p className="text-xs text-[#737373]">
               {isHindi
-                ? 'बाजार में उपलब्ध अन्य ब्रांड्स के स्वस्थ उत्पाद व स्वच्छ सामग्री'
+                ? 'अन्य स्वस्थ ब्रांड्स के विकल्प'
                 : isBengali
-                ? 'বাজারে সহজলভ্য বিকল্প ব্র্যান্ডের স্বাস্থ্যসম্মত পছন্দ'
-                : 'Clean-label market brands with zero palm oil & lower sugar'}
+                ? 'অন্যান্য ব্র্যান্ডের স্বাস্থ্যকর বিকল্প'
+                : 'Healthier alternatives from other brands'}
             </p>
+          </div>
+
+          {/* Liquid Sliding Tab Control */}
+          <div className="relative flex p-0.5 liquid-glass-capsule rounded-full">
+            <button
+              onClick={() => setActiveTab('brand')}
+              className="relative px-3 py-1 text-xs transition-colors z-10 liquid-ripple"
+            >
+              {activeTab === 'brand' && (
+                <motion.div
+                  layoutId="activeSwapTabCapsule"
+                  className="absolute inset-0 rounded-full liquid-glass-active-pill"
+                  transition={{ type: 'spring', stiffness: 450, damping: 32 }}
+                />
+              )}
+              <span
+                className={`relative z-10 font-medium transition-colors duration-150 ${
+                  activeTab === 'brand' ? 'text-white' : 'text-[#737373] hover:text-[#161616]'
+                }`}
+              >
+                {isHindi ? 'ब्रांड्स' : isBengali ? 'ব্র্যান্ড' : 'Brands'}
+              </span>
+            </button>
+            <button
+              onClick={() => setActiveTab('fresh')}
+              className="relative px-3 py-1 text-xs transition-colors z-10 liquid-ripple"
+            >
+              {activeTab === 'fresh' && (
+                <motion.div
+                  layoutId="activeSwapTabCapsule"
+                  className="absolute inset-0 rounded-full liquid-glass-active-pill"
+                  transition={{ type: 'spring', stiffness: 450, damping: 32 }}
+                />
+              )}
+              <span
+                className={`relative z-10 font-medium transition-colors duration-150 ${
+                  activeTab === 'fresh' ? 'text-white' : 'text-[#737373] hover:text-[#161616]'
+                }`}
+              >
+                {isHindi ? 'प्राकृतिक' : isBengali ? 'প্রাকৃতিক' : 'Whole food'}
+              </span>
+            </button>
           </div>
         </div>
 
-        {/* Apple Segmented Control Tab Switcher */}
-        <div className="flex p-1 bg-black/[0.04] rounded-full border border-black/[0.03]">
-          <button
-            onClick={() => setActiveTab('brand')}
-            className={`flex-1 flex items-center justify-center gap-1.5 py-1.5 text-xs font-semibold rounded-full transition-all duration-200 ${
-              activeTab === 'brand'
-                ? 'bg-white text-black shadow-xs'
-                : 'text-[#86868B] hover:text-black'
-            }`}
-          >
-            <Tag className="w-3.5 h-3.5" />
-            <span>{isHindi ? 'अन्य ब्रांड्स' : isBengali ? 'অন্যান্য ব্র্যান্ড' : 'Other Brands'}</span>
-          </button>
-          <button
-            onClick={() => setActiveTab('fresh')}
-            className={`flex-1 flex items-center justify-center gap-1.5 py-1.5 text-xs font-semibold rounded-full transition-all duration-200 ${
-              activeTab === 'fresh'
-                ? 'bg-white text-black shadow-xs'
-                : 'text-[#86868B] hover:text-black'
-            }`}
-          >
-            <Apple className="w-3.5 h-3.5" />
-            <span>{isHindi ? 'ताजा व देसी' : isBengali ? 'তাজা ও প্রাকৃতিক' : 'Fresh & Whole'}</span>
-          </button>
-          <button
-            onClick={() => setActiveTab('all')}
-            className={`flex-1 flex items-center justify-center gap-1.5 py-1.5 text-xs font-semibold rounded-full transition-all duration-200 ${
-              activeTab === 'all'
-                ? 'bg-white text-black shadow-xs'
-                : 'text-[#86868B] hover:text-black'
-            }`}
-          >
-            <span>{isHindi ? 'सभी विकल्प' : isBengali ? 'সব বিকল্প' : 'All Swaps'}</span>
-          </button>
-        </div>
-
-        {/* Alternatives Cards List */}
+        {/* Alternatives Cards List with Understated Glass Hover/Tap Response */}
         <div className="space-y-3">
           {filteredAlternatives.map((alt, index) => {
             const isExpanded = expandedAltIndex === index;
-            const altScore = alt.healthScore || 88;
+            const altScore = alt.healthScore || 85;
 
             return (
               <div
                 key={index}
-                className="bg-white rounded-3xl p-5 border border-black/[0.06] shadow-2xs hover:border-black/15 transition-all duration-200 space-y-3.5"
-                style={{ animationDelay: `${index * 60}ms` }}
+                className="bg-white rounded-[22px] p-5 border border-black/[0.06] shadow-[0_2px_12px_rgba(0,0,0,0.03)] space-y-3 transition-all hover:border-black/[0.12]"
               >
-                {/* Header: Brand Pill + Budget & Health Score */}
+                {/* Brand Badge & Budget Label */}
                 <div className="flex items-center justify-between gap-2">
                   <div className="flex items-center gap-2 flex-wrap">
-                    {/* Brand Badge */}
                     {alt.brand && (
-                      <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-bold tracking-wide uppercase bg-[#1D1D1F] text-white shadow-2xs">
-                        <Tag className="w-3 h-3 text-emerald-400" />
+                      <span className="text-[11px] font-semibold text-[#161616] bg-[#F0EFEA] px-2.5 py-0.5 rounded-full uppercase tracking-wider">
                         {alt.brand}
                       </span>
                     )}
-
-                    {/* Highlight Tag */}
                     {alt.highlightTag && (
-                      <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold bg-emerald-50 text-emerald-800 border border-emerald-200/60">
+                      <span className="text-[11px] font-medium text-emerald-800 bg-emerald-50 px-2.5 py-0.5 rounded-full">
                         {alt.highlightTag}
                       </span>
                     )}
                   </div>
 
-                  {/* Health Score Pill */}
-                  <div className="flex items-center gap-1 bg-emerald-50/80 px-2 py-0.5 rounded-full border border-emerald-100 shrink-0">
-                    <span className="text-[10px] font-bold text-emerald-800">
-                      Score {altScore}
+                  {alt.budgetLevel && (
+                    <span className="text-[11px] text-[#737373]">
+                      {alt.budgetLevel} budget
                     </span>
-                  </div>
+                  )}
                 </div>
 
-                {/* Product Name & Category */}
+                {/* Name */}
                 <div>
-                  <h4 className="text-base font-bold text-[#1D1D1F] tracking-tight leading-snug">
+                  <h4 className="text-base font-semibold text-[#161616] tracking-tight">
                     {alt.name}
                   </h4>
-                  <p className="text-xs text-[#86868B] mt-0.5">
-                    {alt.category} {alt.budgetLevel && `• ${alt.budgetLevel}`}
-                  </p>
+                  <p className="text-xs text-[#737373] mt-0.5">{alt.category}</p>
                 </div>
 
-                {/* Why It's Healthier */}
-                <p className="text-xs text-[#444447] leading-relaxed bg-[#F7F7F5] p-3 rounded-2xl border border-black/[0.02]">
-                  <strong className="text-[#1D1D1F]">
-                    {isHindi ? 'क्यों बेहतर है: ' : isBengali ? 'কেন ভালো: ' : 'Why better: '}
-                  </strong>
+                {/* One Short Reason */}
+                <p className="text-xs text-[#161616] leading-relaxed bg-[#F7F7F5] p-3 rounded-2xl">
                   {alt.whyBetter}
                 </p>
 
-                {/* Interactive Action Strip */}
+                {/* Interactive Actions Row */}
                 <div className="flex items-center justify-between pt-1 gap-2 border-t border-black/[0.04]">
-                  {/* Toggle Comparison Sheet */}
+                  {/* Quick Compare Button */}
                   <button
                     onClick={() => toggleExpand(index)}
-                    className="flex items-center gap-1.5 text-xs font-semibold text-[#1D1D1F] hover:text-black py-1.5 px-3 rounded-full bg-[#F7F7F5] border border-black/[0.05] active:scale-95 transition-all"
+                    className="flex items-center gap-1.5 text-xs font-medium text-[#161616] hover:text-black py-1.5 px-3 rounded-full liquid-glass-capsule liquid-ripple active:scale-[0.98] transition-all"
                   >
-                    <ArrowRightLeft className="w-3.5 h-3.5 text-emerald-600" />
+                    <ArrowRightLeft className="w-3.5 h-3.5 text-emerald-700" />
                     <span>
                       {isExpanded
-                        ? (isHindi ? 'तुलना छुपाएं' : isBengali ? 'তুলনা লুকান' : 'Hide Comparison')
-                        : (isHindi ? 'स्कैन किए गए उत्पाद से तुलना' : isBengali ? 'স্ক্যান করা খাদ্যের সাথে তুলনা' : 'Quick Compare vs Scanned')}
+                        ? (isHindi ? 'तुलना छुपाएं' : isBengali ? 'তুলনা লুকান' : 'Hide comparison')
+                        : (isHindi ? 'सीधी तुलना करें' : isBengali ? 'তুলনা করুন' : 'Compare')}
                     </span>
                     <ChevronDown
-                      className={`w-3.5 h-3.5 text-[#86868B] transition-transform duration-200 ${
+                      className={`w-3.5 h-3.5 text-[#737373] transition-transform duration-200 ${
                         isExpanded ? 'rotate-180' : ''
                       }`}
                     />
                   </button>
 
-                  {/* Find Online / Quick Commerce Action */}
+                  {/* Find Online Action */}
                   <button
                     onClick={() => handleCopySearch(alt, index)}
-                    className="flex items-center gap-1 text-xs font-semibold text-emerald-800 bg-emerald-50 hover:bg-emerald-100/80 border border-emerald-200 py-1.5 px-3 rounded-full active:scale-95 transition-all"
-                    title="Find on Blinkit, Zepto, Instamart, or Amazon"
+                    className="flex items-center gap-1 text-xs font-medium text-emerald-800 bg-emerald-50/90 hover:bg-emerald-100/70 border border-emerald-200/60 py-1.5 px-3 rounded-full liquid-ripple active:scale-[0.98] transition-all"
                   >
                     {copiedIndex === index ? (
                       <>
-                        <Check className="w-3.5 h-3.5 text-emerald-600" />
-                        <span>{isHindi ? 'खोज खोला गया!' : 'Opened Search!'}</span>
+                        <Check className="w-3.5 h-3.5 text-emerald-700" />
+                        <span>Opened!</span>
                       </>
                     ) : (
                       <>
                         <ShoppingBag className="w-3.5 h-3.5 text-emerald-700" />
-                        <span>{isHindi ? 'ऑनलाइन देखें' : isBengali ? 'অনলাইনে খুঁজুন' : 'Find Online'}</span>
+                        <span>{isHindi ? 'ऑनलाइन देखें' : isBengali ? 'অনলাইনে খুঁজুন' : 'Find online'}</span>
                         <ExternalLink className="w-3 h-3 opacity-60 ml-0.5" />
                       </>
                     )}
                   </button>
                 </div>
 
-                {/* Animated Side-by-Side Comparison Drawer */}
+                {/* Smooth Expandable Comparison Card */}
                 {isExpanded && (
-                  <div className="pt-2 animate-slide-up">
-                    <div className="rounded-2xl bg-neutral-900 text-white p-4 space-y-3 text-xs shadow-md">
-                      <div className="flex items-center justify-between pb-2 border-b border-white/10">
-                        <span className="font-bold text-white/90">
-                          {isHindi ? 'सीधी तुलना' : isBengali ? 'সরাসরি তুলনা' : 'Head-to-Head Comparison'}
+                  <motion.div
+                    initial={{ opacity: 0, height: 0 }}
+                    animate={{ opacity: 1, height: 'auto' }}
+                    exit={{ opacity: 0, height: 0 }}
+                    transition={{ duration: 0.22, ease: [0.16, 1, 0.3, 1] }}
+                    className="pt-2 overflow-hidden"
+                  >
+                    <div className="rounded-2xl bg-[#F7F7F5] p-3.5 border border-black/[0.06] space-y-2 text-xs">
+                      <div className="flex items-center justify-between pb-1.5 border-b border-black/[0.06]">
+                        <span className="font-semibold text-[#161616]">
+                          Head-to-Head
                         </span>
-                        <span className="text-[10px] text-white/60">
-                          {result.productName.slice(0, 18)}... vs {alt.brand || 'Alternative'}
+                        <span className="text-[11px] text-emerald-700 font-medium">
+                          +{Math.max(10, altScore - result.healthScore)} pts cleaner
                         </span>
                       </div>
 
                       <div className="grid grid-cols-2 gap-2 text-[11px]">
-                        {/* Scanned Item Column */}
-                        <div className="p-2.5 rounded-xl bg-white/5 border border-white/10 space-y-1.5">
-                          <span className="text-[10px] uppercase font-bold text-rose-300 block truncate">
-                            {result.brand ? `${result.brand}: ` : ''}{result.productName}
+                        {/* Current Scanned Item */}
+                        <div className="p-2.5 rounded-xl bg-white border border-black/[0.04] space-y-1">
+                          <span className="font-semibold text-rose-800 block truncate">
+                            {result.productName}
                           </span>
-                          <div className="space-y-1 text-white/80">
-                            <div>Score: <strong className="text-rose-400">{result.healthScore}/100</strong></div>
-                            <div>Sugar: <span className="text-rose-300">{result.nutrition.sugar}</span></div>
-                            <div>Fat: <span className="text-rose-300">{result.nutrition.fat}</span></div>
-                            <div>
-                              Palm Oil:{' '}
-                              <span className="text-rose-300">
-                                {result.keyFlags.includes('Contains Palm Oil') ? 'Yes (Present)' : 'Check label'}
-                              </span>
-                            </div>
+                          <div className="text-[#737373] space-y-0.5">
+                            <div>Score: <span className="font-semibold text-rose-700">{result.healthScore}/100</span></div>
+                            <div>Sugar: {result.nutrition.sugar}</div>
+                            <div>Fat: {result.nutrition.fat}</div>
                           </div>
                         </div>
 
-                        {/* Better Alternative Column */}
-                        <div className="p-2.5 rounded-xl bg-emerald-500/15 border border-emerald-400/30 space-y-1.5">
-                          <span className="text-[10px] uppercase font-bold text-emerald-300 block truncate">
-                            {alt.brand}: {alt.name}
+                        {/* Cleaner Alternative */}
+                        <div className="p-2.5 rounded-xl bg-emerald-50 border border-emerald-200/60 space-y-1">
+                          <span className="font-semibold text-emerald-900 block truncate">
+                            {alt.brand ? `${alt.brand}: ` : ''}{alt.name}
                           </span>
-                          <div className="space-y-1 text-white/90">
-                            <div>Score: <strong className="text-emerald-300">{altScore}/100</strong></div>
-                            <div>
-                              Sugar:{' '}
-                              <span className="text-emerald-300 font-semibold">
-                                {alt.nutritionComparison?.sugarDiff || 'Zero Refined / Low'}
-                              </span>
-                            </div>
-                            <div>
-                              Fat:{' '}
-                              <span className="text-emerald-300 font-semibold">
-                                {alt.nutritionComparison?.fatDiff || 'Baked / Low Sat Fat'}
-                              </span>
-                            </div>
-                            <div>
-                              Palm Oil:{' '}
-                              <span className="text-emerald-300 font-semibold">
-                                {alt.highlightTag?.toLowerCase().includes('palm oil') || alt.whyBetter.toLowerCase().includes('palm oil')
-                                  ? '0 Palm Oil'
-                                  : 'Zero Trans Fat'}
-                              </span>
-                            </div>
+                          <div className="text-emerald-800 space-y-0.5">
+                            <div>Score: <span className="font-semibold text-emerald-800">{altScore}/100</span></div>
+                            <div>Sugar: {alt.nutritionComparison?.sugarDiff || 'Low / Natural'}</div>
+                            <div>Fat: {alt.nutritionComparison?.fatDiff || 'Zero Palm Oil'}</div>
                           </div>
                         </div>
-                      </div>
-
-                      <div className="text-[11px] text-white/70 pt-1 flex items-center justify-between">
-                        <span>
-                          {isHindi
-                            ? '✓ अन्य ब्रांड के इस उत्पाद में कम हानिकारक एडिटिव्स हैं'
-                            : isBengali
-                            ? '✓ এই ব্র্যান্ডের খাদ্যে কোনো ক্ষতিকর কেমিক্যাল নেই'
-                            : '✓ Significantly cleaner nutrition profile'}
-                        </span>
-                        <span className="text-emerald-400 font-bold">
-                          +{Math.max(10, altScore - result.healthScore)} pts Healthier
-                        </span>
                       </div>
                     </div>
-                  </div>
+                  </motion.div>
                 )}
               </div>
             );
@@ -516,9 +537,9 @@ export const FoodResultView: React.FC<FoodResultViewProps> = ({
 
       {/* Safety Disclaimer */}
       <div className="pt-2 text-center px-4">
-        <p className="text-[11px] text-[#86868B] leading-relaxed">
+        <p className="text-xs text-[#737373] leading-relaxed">
           {result.disclaimer ||
-            'NutriDoc provides general awareness only. It does not diagnose illness or replace a doctor or pharmacist.'}
+            'NutriDoc provides everyday nutritional guidance and does not replace medical advice.'}
         </p>
       </div>
     </div>

@@ -1,103 +1,263 @@
-import React from 'react';
+import React, { useState } from 'react';
+import { motion } from 'motion/react';
 import { Camera, FileText, ArrowRight } from 'lucide-react';
-import { UserProfile } from '../types';
+import { FoodAnalysisResult, ReportAnalysisResult, ScanHistoryItem, UserProfile } from '../types';
 
 interface HomeViewProps {
   onStartFoodScan: () => void;
   onStartReportScan: () => void;
   profile: UserProfile;
+  history?: ScanHistoryItem[];
+  onSelectFood?: (item: FoodAnalysisResult) => void;
+  onSelectReport?: (item: ReportAnalysisResult) => void;
 }
 
 export const HomeView: React.FC<HomeViewProps> = ({
   onStartFoodScan,
   onStartReportScan,
   profile,
+  history = [],
+  onSelectFood,
+  onSelectReport,
 }) => {
   const isHindi = profile.language === 'hi';
   const isBengali = profile.language === 'bn';
 
+  // Liquid option switching state: 'food' | 'report'
+  const [activeScanMode, setActiveScanMode] = useState<'food' | 'report'>('food');
+
+  // Calm time-of-day greeting
+  const hour = new Date().getHours();
+  const greeting =
+    hour < 12
+      ? isHindi ? 'शुभ प्रभात' : isBengali ? 'শুভ সকাল' : 'Good morning'
+      : hour < 17
+      ? isHindi ? 'शुभ दोपहर' : isBengali ? 'শুভ দুপুর' : 'Good afternoon'
+      : isHindi ? 'शुभ संध्या' : isBengali ? 'শুভ সন্ধ্যা' : 'Good evening';
+
+  const recentItems = history.slice(0, 3);
+
+  const handleModeSwitch = (mode: 'food' | 'report') => {
+    setActiveScanMode(mode);
+  };
+
   return (
-    <div className="space-y-6 pb-20 pt-2 animate-fade-in">
-      {/* Friendly Apple Welcome Header */}
-      <div className="space-y-1">
-        <p className="text-[13px] font-medium text-[#86868B] uppercase tracking-wider">
-          {isHindi ? 'दैनिक स्वास्थ्य साथी' : isBengali ? 'দৈনিক স্বাস্থ্য সহায়ক' : 'Everyday Health Companion'}
-        </p>
-        <h2 className="text-2xl font-bold tracking-tight text-[#1D1D1F]">
-          {isHindi ? 'आप क्या जांचना चाहते हैं?' : isBengali ? 'আজ কি পরীক্ষা করতে চান?' : 'What would you like to check?'}
+    <div className="space-y-5 pb-20 pt-1">
+      {/* Calm Header Greeting */}
+      <div className="space-y-1 px-1">
+        <h2 className="text-xl font-semibold tracking-tight text-[#161616]">
+          {greeting}
         </h2>
+        <p className="text-sm text-[#737373]">
+          {isHindi
+            ? 'आज आप क्या जांचना चाहते हैं?'
+            : isBengali
+            ? 'আজ কি পরীক্ষা করতে চান?'
+            : 'What would you like to check today?'}
+        </p>
       </div>
 
-      {/* The Two Main Actions (Strictly Minimal & Large) */}
-      <div className="grid grid-cols-1 gap-4">
+      {/* Liquid Mode Pill Switcher (Water-drop flow under glass) */}
+      <div className="relative p-1 liquid-glass-capsule rounded-full flex items-center">
+        <button
+          onClick={() => handleModeSwitch('food')}
+          className="relative flex-1 flex items-center justify-center gap-2 py-2 text-xs font-semibold rounded-full transition-colors z-10 liquid-ripple"
+        >
+          {activeScanMode === 'food' && (
+            <motion.div
+              layoutId="activeScanModeIndicator"
+              className="absolute inset-0 rounded-full liquid-glass-active-pill"
+              transition={{ type: 'spring', stiffness: 450, damping: 32 }}
+            />
+          )}
+          <span
+            className={`relative z-10 flex items-center gap-1.5 transition-colors duration-150 ${
+              activeScanMode === 'food' ? 'text-white' : 'text-[#737373] hover:text-[#161616]'
+            }`}
+          >
+            <Camera className="w-3.5 h-3.5" />
+            <span>{isHindi ? 'खाद्य स्कैन' : isBengali ? 'খাদ্য স্ক্যান' : 'Food Scan'}</span>
+          </span>
+        </button>
+
+        <button
+          onClick={() => handleModeSwitch('report')}
+          className="relative flex-1 flex items-center justify-center gap-2 py-2 text-xs font-semibold rounded-full transition-colors z-10 liquid-ripple"
+        >
+          {activeScanMode === 'report' && (
+            <motion.div
+              layoutId="activeScanModeIndicator"
+              className="absolute inset-0 rounded-full liquid-glass-active-pill"
+              transition={{ type: 'spring', stiffness: 450, damping: 32 }}
+            />
+          )}
+          <span
+            className={`relative z-10 flex items-center gap-1.5 transition-colors duration-150 ${
+              activeScanMode === 'report' ? 'text-white' : 'text-[#737373] hover:text-[#161616]'
+            }`}
+          >
+            <FileText className="w-3.5 h-3.5" />
+            <span>{isHindi ? 'रिपोर्ट / पर्चा' : isBengali ? 'রিপোর্ট স্ক্যান' : 'Report Scan'}</span>
+          </span>
+        </button>
+      </div>
+
+      {/* The Two Main Action Areas (Large, Elegant, Touch-Friendly) */}
+      <div className="grid grid-cols-1 gap-3.5">
         {/* Action 1: Scan Food */}
         <button
           onClick={onStartFoodScan}
-          className="group relative w-full text-left bg-white rounded-3xl p-6 border border-black/[0.06] shadow-[0_4px_24px_rgba(0,0,0,0.03)] hover:shadow-[0_8px_30px_rgba(0,0,0,0.06)] active:scale-[0.985] transition-all overflow-hidden"
+          className={`w-full text-left bg-white rounded-[22px] p-5.5 border transition-all flex items-center justify-between gap-4 group liquid-ripple ${
+            activeScanMode === 'food'
+              ? 'border-black/[0.14] shadow-[0_4px_20px_rgba(0,0,0,0.05)] ring-1 ring-black/[0.04]'
+              : 'border-black/[0.06] shadow-[0_2px_12px_rgba(0,0,0,0.02)] hover:border-black/[0.1]'
+          } active:scale-[0.985]`}
         >
-          <div className="absolute top-0 right-0 w-36 h-36 bg-gradient-to-bl from-emerald-500/10 via-emerald-500/5 to-transparent rounded-full blur-2xl pointer-events-none group-hover:scale-125 transition-transform duration-500" />
-          
-          <div className="flex items-start justify-between">
-            <div className="w-13 h-13 rounded-2xl bg-emerald-50 text-emerald-700 flex items-center justify-center border border-emerald-100 group-hover:bg-emerald-600 group-hover:text-white transition-all duration-300">
-              <Camera className="w-6 h-6 stroke-[2]" />
+          <div className="flex items-center gap-4 min-w-0">
+            <div className="w-13 h-13 rounded-2xl bg-[#F0EFEA] text-[#161616] flex items-center justify-center shrink-0 group-hover:bg-[#EAE9E4] transition-colors">
+              <Camera className="w-6 h-6 stroke-[1.8]" />
             </div>
-            <div className="w-9 h-9 rounded-full bg-[#F7F7F5] flex items-center justify-center text-[#86868B] group-hover:text-black group-hover:bg-black/5 transition-colors">
-              <ArrowRight className="w-4 h-4" />
+            <div className="space-y-0.5 min-w-0">
+              <h3 className="text-base font-semibold text-[#161616] tracking-tight">
+                {isHindi ? 'खाद्य पैकेट स्कैन करें' : isBengali ? 'খাদ্যের প্যাকেট স্ক্যান করুন' : 'Scan Food'}
+              </h3>
+              <p className="text-xs text-[#737373] leading-relaxed">
+                {isHindi
+                  ? 'नमक, चीनी व तेल की मात्रा और स्वस्थ विकल्प'
+                  : isBengali
+                  ? 'উপাদান ও স্বাস্থ্যকর বিকল্প সন্ধান'
+                  : 'Check ingredients, sugars, and healthier swaps'}
+              </p>
             </div>
           </div>
-
-          <div className="mt-5 space-y-1.5">
-            <div className="inline-flex items-center gap-1.5 text-[11px] font-semibold tracking-wide text-emerald-800 bg-emerald-50 px-2 py-0.5 rounded-full">
-              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-              {isHindi ? 'स्टेप 1: फ्रंट • स्टेप 2: इंग्रीडिएंट्स' : isBengali ? 'ধাপ ১: সামনের দিক • ধাপ ২: উপাদান' : '2-Step Smart Camera Scan'}
-            </div>
-            <h3 className="text-xl font-bold tracking-tight text-[#1D1D1F]">
-              {isHindi ? 'खाद्य पैकेट स्कैन करें' : isBengali ? 'খাদ্যের প্যাকেট স্ক্যান করুন' : 'Scan Food'}
-            </h3>
-            <p className="text-sm text-[#86868B] leading-relaxed">
-              {isHindi
-                ? 'नमक, चीनी, तेल और हानिकारक एडिटिव्स तुरंत पहचानें। स्वस्थ विकल्प पाएं।'
-                : isBengali
-                ? 'লবণ, চিনি ও তেলের সঠিক মাত্রা জানুন। সহজ স্বাস্থ্যকর বিকল্প খুঁজুন।'
-                : 'Point camera at any packaged food or upload packet photos. Instant nutrient breakdown.'}
-            </p>
+          <div className="w-8 h-8 rounded-full bg-[#F7F7F5] flex items-center justify-center text-[#737373] group-hover:text-[#161616] shrink-0 transition-colors">
+            <ArrowRight className="w-4 h-4" />
           </div>
         </button>
 
         {/* Action 2: Understand Prescription / Report */}
         <button
           onClick={onStartReportScan}
-          className="group relative w-full text-left bg-white rounded-3xl p-6 border border-black/[0.06] shadow-[0_4px_24px_rgba(0,0,0,0.03)] hover:shadow-[0_8px_30px_rgba(0,0,0,0.06)] active:scale-[0.985] transition-all overflow-hidden"
+          className={`w-full text-left bg-white rounded-[22px] p-5.5 border transition-all flex items-center justify-between gap-4 group liquid-ripple ${
+            activeScanMode === 'report'
+              ? 'border-black/[0.14] shadow-[0_4px_20px_rgba(0,0,0,0.05)] ring-1 ring-black/[0.04]'
+              : 'border-black/[0.06] shadow-[0_2px_12px_rgba(0,0,0,0.02)] hover:border-black/[0.1]'
+          } active:scale-[0.985]`}
         >
-          <div className="absolute top-0 right-0 w-36 h-36 bg-gradient-to-bl from-blue-500/10 via-blue-500/5 to-transparent rounded-full blur-2xl pointer-events-none group-hover:scale-125 transition-transform duration-500" />
-
-          <div className="flex items-start justify-between">
-            <div className="w-13 h-13 rounded-2xl bg-blue-50 text-blue-700 flex items-center justify-center border border-blue-100 group-hover:bg-blue-600 group-hover:text-white transition-all duration-300">
-              <FileText className="w-6 h-6 stroke-[2]" />
+          <div className="flex items-center gap-4 min-w-0">
+            <div className="w-13 h-13 rounded-2xl bg-[#F0EFEA] text-[#161616] flex items-center justify-center shrink-0 group-hover:bg-[#EAE9E4] transition-colors">
+              <FileText className="w-6 h-6 stroke-[1.8]" />
             </div>
-            <div className="w-9 h-9 rounded-full bg-[#F7F7F5] flex items-center justify-center text-[#86868B] group-hover:text-black group-hover:bg-black/5 transition-colors">
-              <ArrowRight className="w-4 h-4" />
+            <div className="space-y-0.5 min-w-0">
+              <h3 className="text-base font-semibold text-[#161616] tracking-tight">
+                {isHindi ? 'प्रिस्क्रिप्शन या रिपोर्ट समझें' : isBengali ? 'প্রেসক্রিপশন বা রিপোর্ট বুঝুন' : 'Understand Prescription / Report'}
+              </h3>
+              <p className="text-xs text-[#737373] leading-relaxed">
+                {isHindi
+                  ? 'कठिन मेडिकल शब्दों व दवाओं का सरल अर्थ'
+                  : isBengali
+                  ? 'সহজ ভাষায় রিপোর্ট ও ওষুধের নিয়ম'
+                  : 'Translate medical terms and dosage schedules'}
+              </p>
             </div>
           </div>
-
-          <div className="mt-5 space-y-1.5">
-            <div className="inline-flex items-center gap-1.5 text-[11px] font-semibold tracking-wide text-blue-800 bg-blue-50 px-2 py-0.5 rounded-full">
-              <span className="w-1.5 h-1.5 rounded-full bg-blue-500" />
-              {isHindi ? 'सरल भाषा • डॉक्टर पर्चा व टेस्ट' : isBengali ? 'সহজ ভাষা • প্রেসক্রিপশন ও রিপোর্ট' : 'Reports & Handwritten Rx'}
-            </div>
-            <h3 className="text-xl font-bold tracking-tight text-[#1D1D1F]">
-              {isHindi ? 'प्रिस्क्रिप्शन या रिपोर्ट समझें' : isBengali ? 'প্রেসক্রিপশন বা রিপোর্ট বুঝুন' : 'Understand Prescription / Report'}
-            </h3>
-            <p className="text-sm text-[#86868B] leading-relaxed">
-              {isHindi
-                ? 'कठिन मेडिकल शब्दों को सरल बनाएं। हाई/लो टेस्ट वैल्यूज और दवा का सही समय जानें।'
-                : isBengali
-                ? 'জটিল ডাক্তারি রিপোর্টকে সহজ বাংলায় বুঝুন। হাই/লো ফলাফল ও ওষুধের নিয়ম জানুন।'
-                : 'Translate medical terms into plain words. High/low values & dosage timing simplified.'}
-            </p>
+          <div className="w-8 h-8 rounded-full bg-[#F7F7F5] flex items-center justify-center text-[#737373] group-hover:text-[#161616] shrink-0 transition-colors">
+            <ArrowRight className="w-4 h-4" />
           </div>
         </button>
       </div>
+
+      {/* Visually Quiet and Secondary Recent Scans */}
+      {recentItems.length > 0 && (
+        <div className="pt-2 space-y-2.5">
+          <div className="flex items-center justify-between px-1">
+            <span className="text-xs font-medium text-[#737373]">
+              {isHindi ? 'हाल के स्कैन' : isBengali ? 'সাম্প্রতিক স্ক্যান' : 'Recent scans'}
+            </span>
+          </div>
+
+          <div className="space-y-2">
+            {recentItems.map((item, index) => {
+              if (item.type === 'food') {
+                const f = item.data;
+                const statusDot =
+                  f.status === 'Good Choice'
+                    ? 'bg-emerald-500'
+                    : f.status === 'Limit'
+                    ? 'bg-amber-500'
+                    : 'bg-rose-500';
+
+                return (
+                  <button
+                    key={f.id || index}
+                    onClick={() => onSelectFood?.(f)}
+                    className="w-full text-left bg-white rounded-2xl p-3.5 border border-black/[0.05] shadow-[0_1px_6px_rgba(0,0,0,0.02)] hover:border-black/[0.1] active:scale-[0.99] transition-all flex items-center justify-between gap-3 liquid-ripple"
+                  >
+                    <div className="flex items-center gap-3 min-w-0">
+                      {f.imageUrl ? (
+                        <img
+                          src={f.imageUrl}
+                          alt={f.productName}
+                          className="w-10 h-10 rounded-xl object-cover bg-black/5 shrink-0"
+                        />
+                      ) : (
+                        <div className="w-10 h-10 rounded-xl bg-[#F0EFEA] text-[#161616] flex items-center justify-center font-bold text-xs shrink-0">
+                          {f.productName.slice(0, 2).toUpperCase()}
+                        </div>
+                      )}
+                      <div className="min-w-0">
+                        <div className="flex items-center gap-1.5">
+                          <span className={`w-1.5 h-1.5 rounded-full ${statusDot}`} />
+                          <span className="text-[11px] font-medium text-[#737373]">
+                            {f.status}
+                          </span>
+                        </div>
+                        <h4 className="text-xs font-semibold text-[#161616] truncate mt-0.5">
+                          {f.productName}
+                        </h4>
+                      </div>
+                    </div>
+                    <div className="text-[11px] text-[#737373] shrink-0 font-medium">
+                      {f.healthScore}/100
+                    </div>
+                  </button>
+                );
+              } else {
+                const r = item.data;
+                return (
+                  <button
+                    key={r.id || index}
+                    onClick={() => onSelectReport?.(r)}
+                    className="w-full text-left bg-white rounded-2xl p-3.5 border border-black/[0.05] shadow-[0_1px_6px_rgba(0,0,0,0.02)] hover:border-black/[0.1] active:scale-[0.99] transition-all flex items-center justify-between gap-3 liquid-ripple"
+                  >
+                    <div className="flex items-center gap-3 min-w-0">
+                      <div className="w-10 h-10 rounded-xl bg-[#F0EFEA] text-[#161616] flex items-center justify-center font-bold text-xs shrink-0">
+                        {r.documentType === 'Prescription' ? 'Rx' : 'Lab'}
+                      </div>
+                      <div className="min-w-0">
+                        <div className="flex items-center gap-1.5">
+                          <span className="text-[11px] font-medium text-[#737373]">
+                            {r.documentType}
+                          </span>
+                        </div>
+                        <h4 className="text-xs font-semibold text-[#161616] truncate mt-0.5">
+                          {r.summary.slice(0, 36)}...
+                        </h4>
+                      </div>
+                    </div>
+                    <div className="text-[11px] text-[#737373] shrink-0 font-medium">
+                      {new Date(r.timestamp).toLocaleDateString(undefined, {
+                        month: 'short',
+                        day: 'numeric',
+                      })}
+                    </div>
+                  </button>
+                );
+              }
+            })}
+          </div>
+        </div>
+      )}
     </div>
   );
 };

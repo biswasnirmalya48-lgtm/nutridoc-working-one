@@ -1,5 +1,5 @@
 import React, { useRef, useState } from 'react';
-import { Camera, Upload, FileText, ArrowLeft, AlertCircle, RefreshCw } from 'lucide-react';
+import { Camera, Upload, FileText, ArrowLeft, AlertCircle } from 'lucide-react';
 import { ReportAnalysisResult, UserProfile } from '../../types';
 
 interface ReportScannerProps {
@@ -95,7 +95,7 @@ export const ReportScanner: React.FC<ReportScannerProps> = ({
     setIsProcessing(true);
     setErrorMessage(null);
     setLoadingText(
-      isHindi ? 'आपकी रिपोर्ट पढ़ी जा रही है…' : isBengali ? 'আপনার রিপোর্টটি পড়া হচ্ছে…' : 'Reading your report…'
+      isHindi ? 'दस्तावेज़ पढ़ा जा रहा है…' : isBengali ? 'ডকুমেন্ট পড়া হচ্ছে…' : 'Reading document'
     );
 
     try {
@@ -114,8 +114,11 @@ export const ReportScanner: React.FC<ReportScannerProps> = ({
         if (data.error) {
           throw new Error(data.error);
         }
-        setIsProcessing(false);
-        onAnalyzeComplete(data);
+        setLoadingText('Preparing your result');
+        setTimeout(() => {
+          setIsProcessing(false);
+          onAnalyzeComplete(data);
+        }, 350);
       } else {
         const errJson = await res.json().catch(() => ({}));
         throw new Error(errJson.error || 'Failed to read document.');
@@ -130,7 +133,7 @@ export const ReportScanner: React.FC<ReportScannerProps> = ({
   };
 
   return (
-    <div className="space-y-6 pb-20 animate-fade-in">
+    <div className="space-y-6 pb-20">
       <canvas ref={canvasRef} className="hidden" />
       <input
         type="file"
@@ -140,19 +143,19 @@ export const ReportScanner: React.FC<ReportScannerProps> = ({
         onChange={handleFileUpload}
       />
 
-      {/* Top Header */}
+      {/* Top Floating Header */}
       <div className="flex items-center justify-between pt-1">
         <button
           onClick={() => {
             stopCamera();
             onCancel();
           }}
-          className="flex items-center gap-1.5 text-xs font-semibold text-[#1D1D1F] hover:text-black py-1.5 px-3 rounded-full bg-white border border-black/[0.06] shadow-2xs active:scale-95 transition-all"
+          className="flex items-center gap-1.5 text-xs font-medium text-[#161616] hover:text-black py-1.5 px-3 rounded-full liquid-glass-capsule liquid-ripple active:scale-[0.98] transition-all"
         >
-          <ArrowLeft className="w-4 h-4" />
+          <ArrowLeft className="w-3.5 h-3.5" />
           <span>{isHindi ? 'वापस' : isBengali ? 'পেছনে' : 'Home'}</span>
         </button>
-        <span className="text-xs font-bold text-[#1D1D1F]">
+        <span className="text-xs font-semibold text-[#161616]">
           {isHindi ? 'रिपोर्ट व पर्चा समझें' : isBengali ? 'রিপোর্ট ও প্রেসক্রিপশন' : 'Prescription & Report'}
         </span>
         <div className="w-12" />
@@ -160,17 +163,17 @@ export const ReportScanner: React.FC<ReportScannerProps> = ({
 
       {/* Error Banner if scan failed */}
       {errorMessage && (
-        <div className="p-4 rounded-2xl bg-rose-50 border border-rose-200 text-rose-900 space-y-2 animate-fade-in">
+        <div className="p-4 rounded-2xl bg-rose-50/90 border border-rose-200 text-rose-900 space-y-2 animate-fade-in">
           <div className="flex items-start gap-2">
             <AlertCircle className="w-4 h-4 text-rose-600 mt-0.5 shrink-0" />
             <div className="space-y-1">
-              <h4 className="text-xs font-bold">Document Error</h4>
+              <h4 className="text-xs font-semibold">Document Notice</h4>
               <p className="text-xs leading-relaxed text-rose-800">{errorMessage}</p>
             </div>
           </div>
           <button
             onClick={() => setErrorMessage(null)}
-            className="text-xs font-semibold text-rose-700 underline pl-6 hover:text-rose-900"
+            className="text-xs font-medium text-rose-700 underline pl-6 hover:text-rose-900"
           >
             Try Again
           </button>
@@ -179,7 +182,7 @@ export const ReportScanner: React.FC<ReportScannerProps> = ({
 
       {/* If in live camera mode */}
       {mode === 'camera' ? (
-        <div className="relative rounded-3xl overflow-hidden bg-black aspect-3/4 flex items-center justify-center border border-black/10 shadow-lg">
+        <div className="relative rounded-[28px] overflow-hidden bg-black aspect-3/4 flex items-center justify-center border border-white/20 shadow-xl">
           <video
             ref={videoRef}
             playsInline
@@ -188,99 +191,98 @@ export const ReportScanner: React.FC<ReportScannerProps> = ({
             className="w-full h-full object-cover"
           />
 
-          {/* Document Framing Guide */}
-          <div className="absolute inset-8 rounded-2xl border-2 border-white/70 shadow-[0_0_0_9999px_rgba(0,0,0,0.5)] flex flex-col items-center justify-between p-4 pointer-events-none">
-            <span className="bg-black/60 backdrop-blur-md px-3 py-1 rounded-full text-white text-[11px] font-medium">
+          {/* Document Framing Guide with soft glow */}
+          <div className="absolute inset-8 rounded-[24px] border-2 border-white/70 shadow-[0_0_0_9999px_rgba(0,0,0,0.52)] flex flex-col items-center justify-between p-4 pointer-events-none">
+            <span className="bg-black/60 backdrop-blur-md px-3.5 py-1 rounded-full text-white text-[11px] font-medium border border-white/10">
               Align document inside frame
             </span>
-            <span className="bg-black/60 backdrop-blur-md px-3 py-1 rounded-full text-white text-[11px] text-center">
-              Printed lab report or Doctor Rx
+            <span className="bg-black/60 backdrop-blur-md px-3.5 py-1 rounded-full text-white text-[11px] text-center border border-white/10">
+              Printed lab report or doctor Rx
             </span>
           </div>
 
-          {/* Shutter button */}
+          {/* Floating Glass Camera Controls */}
           <div className="absolute bottom-5 inset-x-0 flex items-center justify-center gap-6">
             <button
               onClick={() => {
                 stopCamera();
                 setMode('upload');
               }}
-              className="px-4 py-2 rounded-full bg-white/20 text-white text-xs font-semibold backdrop-blur-md"
+              className="px-4 py-2 rounded-full liquid-glass-control text-white text-xs font-medium active:scale-95 transition-all shadow-md"
             >
               Cancel
             </button>
             <button
               onClick={handleCaptureDoc}
-              className="w-16 h-16 rounded-full border-4 border-white p-1 flex items-center justify-center active:scale-95 transition-transform"
+              className="w-16 h-16 rounded-full border-4 border-white/80 p-1 flex items-center justify-center active:scale-95 transition-transform backdrop-blur-md shadow-lg"
             >
-              <div className="w-full h-full rounded-full bg-white" />
+              <div className="w-full h-full rounded-full bg-white shadow-inner" />
             </button>
           </div>
         </div>
       ) : (
-        /* Upload & Action Choices Card */
+        /* Large Simple Document Upload Area */
         <div className="space-y-4">
-          <div className="bg-white rounded-3xl p-6 border border-black/[0.06] shadow-[0_4px_24px_rgba(0,0,0,0.03)] space-y-4">
-            <div className="text-center space-y-1">
-              <div className="w-12 h-12 rounded-2xl bg-blue-50 text-blue-600 mx-auto flex items-center justify-center mb-3">
-                <FileText className="w-6 h-6 stroke-[2]" />
-              </div>
-              <h3 className="text-lg font-bold tracking-tight text-[#1D1D1F]">
-                {isHindi ? 'दस्तावेज़ जोड़ें' : isBengali ? 'ডকুমেন্ট যুক্ত করুন' : 'Scan or Upload Document'}
-              </h3>
-              <p className="text-xs text-[#86868B] max-w-xs mx-auto leading-relaxed">
+          <div className="bg-white rounded-[24px] p-8 border border-black/[0.06] shadow-[0_2px_16px_rgba(0,0,0,0.03)] text-center space-y-6">
+            <div className="w-16 h-16 rounded-[22px] bg-[#F0EFEA] text-[#161616] mx-auto flex items-center justify-center">
+              <FileText className="w-8 h-8 stroke-[1.8]" />
+            </div>
+
+            <div className="space-y-1.5">
+              <h2 className="text-xl font-bold tracking-tight text-[#161616]">
+                {isHindi ? 'प्रिस्क्रिप्शन या हेल्थ रिपोर्ट अपलोड करें' : isBengali ? 'প্রেসক্রিপশন বা স্বাস্থ্য রিপোর্ট আপলোড করুন' : 'Upload a prescription or health report'}
+              </h2>
+              <p className="text-xs text-[#737373]">
                 {isHindi
-                  ? 'फोटो खींचें, फोटो गैलरी से चुनें, या PDF अपलोड करें। हस्तलिखित पर्चे या प्रिंटेड लैब रिपोर्ट दोनों समर्थित हैं।'
+                  ? 'प्रिंटेड रिपोर्ट या डॉक्टर का हस्तलिखित पर्चा'
                   : isBengali
-                  ? 'ছবি তুলুন, গ্যালারি থেকে নির্বাচন করুন বা PDF আপলোড করুন। ল্যাব টেস্ট ও হাতের লেখা প্রেসক্রিপশন উভয়ই সমর্থিত।'
-                  : 'Take a photo, upload an image or PDF. Reads printed lab tests and handwritten prescriptions with high accuracy.'}
+                  ? 'ল্যাব টেস্ট বা ডাক্তারের প্রেসক্রিপশন'
+                  : 'Printed lab tests or doctor’s prescription'}
               </p>
             </div>
 
-            {/* Two Primary Input Options */}
-            <div className="grid grid-cols-2 gap-3 pt-2">
+            {/* Large Soft Glass Controls */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5 pt-2">
               <button
                 onClick={startCamera}
-                className="flex flex-col items-center justify-center gap-2 p-4 rounded-2xl bg-[#F7F7F5] border border-black/[0.04] hover:bg-black/5 active:scale-95 transition-all text-center"
+                className="w-full flex items-center justify-center gap-3 p-4 rounded-2xl liquid-glass-control text-[#161616] liquid-ripple active:scale-[0.98] transition-all shadow-xs"
               >
-                <div className="w-10 h-10 rounded-full bg-white flex items-center justify-center text-blue-600 shadow-2xs">
-                  <Camera className="w-5 h-5" />
-                </div>
-                <span className="text-xs font-bold text-[#1D1D1F]">
-                  {isHindi ? 'कैमरा से फोटो' : isBengali ? 'ক্যামেরা ফটো' : 'Take Photo'}
+                <Camera className="w-5 h-5 stroke-[1.8] text-[#161616]" />
+                <span className="text-sm font-semibold">
+                  {isHindi ? 'कैमरा से स्कैन करें' : isBengali ? 'ক্যামেরা দিয়ে স্ক্যান' : 'Use Camera'}
                 </span>
-                <span className="text-[10px] text-[#86868B]">Live document frame</span>
               </button>
 
               <button
                 onClick={() => fileInputRef.current?.click()}
-                className="flex flex-col items-center justify-center gap-2 p-4 rounded-2xl bg-[#F7F7F5] border border-black/[0.04] hover:bg-black/5 active:scale-95 transition-all text-center"
+                className="w-full flex items-center justify-center gap-3 p-4 rounded-2xl liquid-glass-control text-[#161616] liquid-ripple active:scale-[0.98] transition-all shadow-xs"
               >
-                <div className="w-10 h-10 rounded-full bg-white flex items-center justify-center text-emerald-600 shadow-2xs">
-                  <Upload className="w-5 h-5" />
-                </div>
-                <span className="text-xs font-bold text-[#1D1D1F]">
-                  {isHindi ? 'गैलरी या PDF' : isBengali ? 'গ্যালারি বা PDF' : 'Upload Image / PDF'}
+                <Upload className="w-5 h-5 stroke-[1.8] text-[#161616]" />
+                <span className="text-sm font-semibold">
+                  {isHindi ? 'गैलरी या PDF चुनें' : isBengali ? 'ছবি বা PDF আপলোড' : 'Upload File / PDF'}
                 </span>
-                <span className="text-[10px] text-[#86868B]">PNG, JPG, PDF</span>
               </button>
             </div>
           </div>
         </div>
       )}
 
-      {/* Processing Screen State */}
+      {/* Processing Calm Morphing Liquid Dot Animation Screen */}
       {isProcessing && (
-        <div className="fixed inset-0 z-50 bg-[#F7F7F5]/90 backdrop-blur-md flex flex-col items-center justify-center p-6 text-center space-y-4 animate-fade-in">
-          <div className="w-12 h-12 rounded-full border-3 border-black/10 border-t-blue-600 animate-spin" />
+        <div className="fixed inset-0 z-50 bg-[#FBFBFA]/90 backdrop-blur-md flex flex-col items-center justify-center p-6 text-center space-y-4 animate-fade-in">
+          <div className="flex items-center gap-2 justify-center py-2">
+            <div className="w-3.5 h-3.5 rounded-full bg-emerald-500 animate-liquid-dot-1 shadow-[0_0_12px_rgba(16,185,129,0.5)]" />
+            <div className="w-3.5 h-3.5 rounded-full bg-emerald-500 animate-liquid-dot-2 shadow-[0_0_12px_rgba(16,185,129,0.5)]" />
+            <div className="w-3.5 h-3.5 rounded-full bg-emerald-500 animate-liquid-dot-3 shadow-[0_0_12px_rgba(16,185,129,0.5)]" />
+          </div>
           <div className="space-y-1">
-            <h4 className="text-base font-bold text-[#1D1D1F]">{loadingText}</h4>
-            <p className="text-xs text-[#86868B] max-w-xs">
+            <h4 className="text-base font-semibold text-[#161616] tracking-tight">{loadingText}</h4>
+            <p className="text-xs text-[#737373] max-w-xs">
               {isHindi
-                ? 'कठिन मेडिकल शब्दों को आसान भाषा में तैयार किया जा रहा है...'
+                ? 'कठिन मेडिकल शब्दों को आसान भाषा में तैयार किया जा रहा है…'
                 : isBengali
-                ? 'জটিল ডাক্তারি পরিভাষা সহজ ভাষায় অনুবাদ করা হচ্ছে...'
-                : 'Translating clinical markers and instructions into simple language...'}
+                ? 'জটিল ডাক্তারি পরিভাষা সহজ ভাষায় অনুবাদ করা হচ্ছে…'
+                : 'Translating clinical markers and instructions into plain language…'}
             </p>
           </div>
         </div>

@@ -1,5 +1,6 @@
 import React from 'react';
-import { Home, History, User } from 'lucide-react';
+import { motion } from 'motion/react';
+import { History, User, Home } from 'lucide-react';
 import { Language } from '../types';
 
 interface BottomNavProps {
@@ -28,8 +29,8 @@ export const BottomNav: React.FC<BottomNavProps> = ({ activeTab, onChangeTab, la
   ];
 
   return (
-    <nav className="fixed bottom-0 left-0 right-0 z-40 bg-[#F7F7F5]/90 backdrop-blur-xl border-t border-black/[0.05] pb-[env(safe-area-inset-bottom,12px)] pt-1">
-      <div className="max-w-md mx-auto px-6 h-14 flex items-center justify-around">
+    <nav className="fixed bottom-4 inset-x-4 max-w-xs mx-auto z-40 liquid-glass-nav rounded-full p-1.5 transition-all">
+      <div className="flex items-center justify-around relative">
         {tabs.map((tab) => {
           const Icon = tab.icon;
           const isActive = activeTab === tab.id;
@@ -37,18 +38,22 @@ export const BottomNav: React.FC<BottomNavProps> = ({ activeTab, onChangeTab, la
             <button
               key={tab.id}
               onClick={() => onChangeTab(tab.id)}
-              className={`flex flex-col items-center justify-center flex-1 py-1 transition-all ${
-                isActive ? 'text-black' : 'text-[#86868B] hover:text-[#505054]'
-              }`}
+              className="relative flex items-center justify-center py-2 px-4 rounded-full transition-all liquid-ripple"
             >
-              <div className="relative">
-                <Icon className={`w-5 h-5 transition-transform duration-200 ${isActive ? 'scale-110 stroke-[2.2]' : 'stroke-[1.7]'}`} />
-                {isActive && (
-                  <span className="absolute -bottom-1.5 left-1/2 -translate-x-1/2 w-1 h-1 rounded-full bg-black" />
-                )}
-              </div>
-              <span className={`text-[11px] mt-1 transition-all ${isActive ? 'font-semibold text-black' : 'font-medium'}`}>
-                {tab.label}
+              {isActive && (
+                <motion.div
+                  layoutId="activeBottomNavCapsule"
+                  className="absolute inset-0 rounded-full liquid-glass-active-pill"
+                  transition={{ type: 'spring', stiffness: 450, damping: 32 }}
+                />
+              )}
+              <span
+                className={`relative z-10 flex items-center gap-1.5 transition-colors duration-150 ${
+                  isActive ? 'text-white font-medium' : 'text-[#737373] hover:text-[#161616]'
+                }`}
+              >
+                <Icon className={`w-4 h-4 ${isActive ? 'stroke-[2.2]' : 'stroke-[1.8]'}`} />
+                <span className="text-xs">{tab.label}</span>
               </span>
             </button>
           );
