@@ -1,0 +1,9 @@
+{
+  "name": "NutriDoc",
+  "description": "Minimal, Apple-inspired Food Scanner and Medical Prescription & Lab Report Simplifier with plain language explanations.",
+  "requestFramePermissions": [
+    "camera"
+  ],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
+
