@@ -2,7 +2,6 @@ import express, { Request, Response } from 'express';
 import dotenv from 'dotenv';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import { GoogleGenAI } from '@google/genai';
 import { evaluateFoodNutrition } from './src/utils/nutritionEngine.ts';
 
 dotenv.config();
@@ -15,21 +14,23 @@ const PORT = process.env.PORT ? parseInt(process.env.PORT, 10) : 3000;
 
 app.use(express.json({ limit: '25mb' }));
 
-// Initialize Google GenAI (Server-side only)
-let ai: GoogleGenAI | null = null;
-if (process.env.GEMINI_API_KEY) {
-  try {
-    ai = new GoogleGenAI({
-      apiKey: process.env.GEMINI_API_KEY,
-      httpOptions: {
-        headers: {
-          'User-Agent': 'aistudio-build',
-        },
-      },
-    });
-  } catch (err) {
-    console.error('Failed to init GoogleGenAI:', err);
-  }
+// Groq powers all AI calls (OpenAI-compatible chat completions API).
+// Requires GROQ_API_KEY. Without it the app falls back to deterministic
+// rule-based scoring and local extractors.
+const GROQ_API_URL = 'https://api.groq.com/openai/v1/chat/completions';
+const GROQ_MODELS = [
+  'openai/gpt-oss-120b',
+  'qwen/qwen3.8-27b',
+  'openai/gpt-oss-20b',
+];
+// This Groq account's catalog has no vision models, so photo-based
+// endpoints (camera recognition, OCR) use their graceful fallbacks.
+// Flip to true if a vision model becomes available.
+const GROQ_HAS_VISION = false;
+
+let ai = false;
+if (process.env.GROQ_API_KEY) {
+  ai = true;
 }
 
 // Robust JSON extractor that handles markdown codeblocks, preamble, and stray characters
@@ -67,35 +68,66 @@ function extractJson<T = any>(rawText: string | undefined | null): T | null {
   return null;
 }
 
-// Resilient multi-model Gemini caller (prioritizes high-quota flash-lite models to prevent 429 resource_exhausted)
-async function callGemini(contents: any, config?: any) {
+// Resilient multi-model Groq caller. `contents` is either a plain string
+// prompt or a Gemini-style { parts: [{text} | {inlineData: {mimeType, data}}] }
+// object, which is converted to OpenAI chat-completions content.
+async function callAI(contents: any, _config?: any) {
   if (!ai) throw new Error('AI client not initialized');
-  const models = [
-    'gemini-flash-lite-latest',
-    'gemini-3.5-flash-lite',
-    'gemini-3.1-flash-lite',
-    'gemini-3.8-flash',
-    'gemini-flash-latest',
-    'gemini-2.5-flash',
-  ];
+
+  let messageContent: any;
+  if (typeof contents === 'string') {
+    messageContent = contents;
+  } else if (Array.isArray(contents?.parts)) {
+    messageContent = contents.parts
+      .map((p: any) => {
+        if (p.text) return { type: 'text', text: p.text };
+        if (p.inlineData) {
+          return {
+            type: 'image_url',
+            image_url: { url: `data:${p.inlineData.mimeType};base64,${p.inlineData.data}` },
+          };
+        }
+        return null;
+      })
+      .filter(Boolean);
+  } else {
+    messageContent = String(contents);
+  }
+
   let lastError: any = null;
 
-  for (const m of models) {
+  for (const model of GROQ_MODELS) {
     try {
-      const res = await ai.models.generateContent({
-        model: m,
-        contents,
-        config,
+      const groqRes = await fetch(GROQ_API_URL, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${process.env.GROQ_API_KEY}`,
+        },
+        body: JSON.stringify({
+          model,
+          messages: [{ role: 'user', content: messageContent }],
+          max_tokens: 4096,
+        }),
       });
-      if (res && res.text) {
-        return res;
+
+      if (!groqRes.ok) {
+        const errText = await groqRes.text();
+        throw new Error(`Groq ${groqRes.status}: ${errText.slice(0, 200)}`);
       }
+
+      const data = await groqRes.json();
+      const text: string | undefined = data?.choices?.[0]?.message?.content;
+      if (text) {
+        return { text };
+      }
+      throw new Error('Groq returned empty content');
     } catch (e: any) {
-      console.warn(`Model ${m} attempt failed:`, e?.message?.slice(0, 100) || e?.status);
+      console.warn(`Groq model ${model} attempt failed:`, (e?.message || String(e)).slice(0, 150));
       lastError = e;
     }
   }
-  throw lastError || new Error('All Gemini models failed');
+  throw lastError || new Error('All Groq models failed');
 }
 
 // Food analysis endpoint
@@ -126,85 +158,13 @@ app.post('/api/food-analysis', async (req: Request, res: Response) => {
       barcode
     );
 
-    // 2. Enhance personal note & reasons with AI (Grok or Gemini) if keys are provided
+    // 2. Enhance personal note & reasons with AI if a key is provided
     let aiEnhanced = false;
     const lang = safeProfile.language || 'en';
 
-    if (process.env.GROK_API_KEY) {
+    if (ai) {
       try {
-        const grokPrompt = `You are NutriDoc's clinical nutrition engine. Analyze this packaged food item:
-Product: ${productName} (${brand || ''})
-Category: ${category}
-Deterministic Health Score: ${baseEvaluation.healthScore}/100, Status: ${baseEvaluation.status}
-Nutrients: Sugar=${baseEvaluation.nutrition.sugar}, Sodium=${baseEvaluation.nutrition.sodium}, Fat=${baseEvaluation.nutrition.fat}, Protein=${baseEvaluation.nutrition.protein}, Fibre=${baseEvaluation.nutrition.fibre}
-Ingredients: ${(safeNutrition.ingredients || []).join(', ')}
-User Profile: Age ${safeProfile.ageRange}, Conditions: Diabetes=${safeProfile.conditions.diabetes}, High BP=${safeProfile.conditions.highBP}, Cholesterol=${safeProfile.conditions.cholesterol}, Weight=${safeProfile.conditions.weightManagement}, Allergies=${(safeProfile.allergies || []).join(', ')}
-Language: ${lang} (en=English, hi=Hindi, bn=Bengali)
-
-CRITICAL INSTRUCTION FOR ALTERNATIVES:
-Under "betterAlternatives", you MUST suggest 3-4 HEALTHIER PRODUCTS FROM OTHER REAL MARKET BRANDS (such as The Whole Truth, Yoga Bar, Slurrp Farm, Epigamia, Too Yumm!, TagZ Foods, Tata Soulfull, Farmley, True Elements, Amul, Raw Pressery, or other well-known cleaner brand alternatives). Do NOT suggest the same brand (${brand || 'current brand'}). Each suggestion must be a real packaged consumer product or clean swap.
-
-Respond ONLY in valid JSON matching this schema:
-{
-  "simpleReason": "Short direct sentence (Why status is Good Choice/Limit/Avoid)",
-  "personalNote": "Short personalized sentence for the user's specific health condition",
-  "betterAlternatives": [
-    {
-      "brand": "Other Brand Name",
-      "name": "Full Product Name",
-      "category": "Category",
-      "whyBetter": "One short sentence why it's better (e.g., zero palm oil, 50% less fat, sweetened with dates)",
-      "budgetLevel": "₹30–₹50",
-      "highlightTag": "Baked • 0 Palm Oil",
-      "healthScore": 88,
-      "type": "brand"
-    }
-  ]
-}
-No markdown backticks, just raw json. Keep reasons concise, Apple-like, no long biology text.`;
-
-        const grokRes = await fetch('https://api.x.ai/v1/chat/completions', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${process.env.GROK_API_KEY}`,
-          },
-          body: JSON.stringify({
-            model: 'grok-beta',
-            messages: [{ role: 'user', content: grokPrompt }],
-            temperature: 0.2,
-          }),
-        });
-
-        if (grokRes.ok) {
-          const grokData = await grokRes.json();
-          const rawText = grokData.choices?.[0]?.message?.content?.trim();
-          const parsed = extractJson<any>(rawText);
-          if (parsed) {
-            if (parsed.simpleReason) baseEvaluation.simpleReason = parsed.simpleReason;
-            if (parsed.personalNote) baseEvaluation.personalNote = parsed.personalNote;
-            if (parsed.betterAlternatives && Array.isArray(parsed.betterAlternatives) && parsed.betterAlternatives.length > 0) {
-              baseEvaluation.betterAlternatives = parsed.betterAlternatives.map((alt: any, idx: number) => ({
-                brand: alt.brand || 'Healthier Choice',
-                name: alt.name || `Alternative Option ${idx + 1}`,
-                category: alt.category || category || 'Healthier Swap',
-                whyBetter: alt.whyBetter || 'Better nutrient balance and cleaner ingredients.',
-                budgetLevel: alt.budgetLevel || 'Under ₹40',
-                highlightTag: alt.highlightTag || 'Clean Ingredients',
-                healthScore: Number(alt.healthScore) || (82 + (idx % 3) * 5),
-                type: alt.type || 'brand',
-                nutritionComparison: alt.nutritionComparison,
-              }));
-            }
-            aiEnhanced = true;
-          }
-        }
-      } catch (e) {
-        console.warn('Grok API call fallback to deterministic rules:', e);
-      }
-    } else if (ai) {
-      try {
-        const geminiPrompt = `Analyze this food for NutriDoc:
+        const aiPrompt = `Analyze this food for NutriDoc:
 Product: ${productName} (${brand || ''}), Category: ${category}
 Deterministic Status: ${baseEvaluation.status} (${baseEvaluation.healthScore}/100)
 Nutrients: Sugar=${baseEvaluation.nutrition.sugar}, Sodium=${baseEvaluation.nutrition.sodium}, Fat=${baseEvaluation.nutrition.fat}, Protein=${baseEvaluation.nutrition.protein}, Fibre=${baseEvaluation.nutrition.fibre}
@@ -232,7 +192,7 @@ Return ONLY valid JSON:
   ]
 }`;
 
-        const response = await callGemini(geminiPrompt, {
+        const response = await callAI(aiPrompt, {
           responseMimeType: 'application/json',
         });
 
@@ -258,7 +218,7 @@ Return ONLY valid JSON:
           }
         }
       } catch (err) {
-        console.warn('Gemini food analysis error, using deterministic evaluation:', err);
+        console.warn('AI food analysis error, using deterministic evaluation:', err);
       }
     }
 
@@ -276,8 +236,8 @@ app.post('/api/report-analysis', async (req: Request, res: Response) => {
 
     const rawText = text || '';
 
-    // If Gemini Vision or Text is available
-    if (ai) {
+    // If AI is enabled (text-only when no vision model is available)
+    if (ai && (GROQ_HAS_VISION || !imageBase64)) {
       try {
         const parts: any[] = [];
         if (imageBase64) {
@@ -338,7 +298,7 @@ Return strict JSON only matching:
 
         parts.push({ text: promptText });
 
-        const response = await callGemini({ parts }, {
+        const response = await callAI({ parts }, {
           responseMimeType: 'application/json',
         });
 
@@ -353,7 +313,7 @@ Return strict JSON only matching:
           }
         }
       } catch (err) {
-        console.warn('Gemini report analysis error, falling back to local extractor:', err);
+        console.warn('AI report analysis error, falling back to local extractor:', err);
       }
     }
 
@@ -452,8 +412,8 @@ app.post('/api/recognize-product', async (req: Request, res: Response) => {
       }
     }
 
-    // 2. Use Gemini Vision to recognize the food item or packet
-    if (imageBase64) {
+    // 2. Use AI vision to recognize the food item or packet (skipped when no vision model)
+    if (imageBase64 && GROQ_HAS_VISION) {
       try {
         let mimeType = 'image/jpeg';
         if (imageBase64.includes('data:image/png')) mimeType = 'image/png';
@@ -488,7 +448,7 @@ TASK:
 
 Return STRICT JSON only matching this schema.`;
 
-        const response = await callGemini({
+        const response = await callAI({
           parts: [
             { inlineData: { mimeType, data: cleanBase64 } },
             { text: prompt },
@@ -526,7 +486,7 @@ Return STRICT JSON only matching this schema.`;
           }
         }
       } catch (err: any) {
-        console.warn('Gemini food recognition error, using resilient recognition fallback:', err?.message || err);
+        console.warn('AI food recognition error, using resilient recognition fallback:', err?.message || err);
         // Resilient fallback so user can comfortably continue to Step 2 without blocking errors
         return res.json({
           productName: 'Packaged Food Snack',
@@ -581,7 +541,7 @@ Return STRICT JSON:
   }
 }`;
 
-        const queryRes = await callGemini(queryPrompt, { responseMimeType: 'application/json' });
+        const queryRes = await callAI(queryPrompt, { responseMimeType: 'application/json' });
         if (queryRes.text) {
           const parsed = extractJson<any>(queryRes.text);
           if (parsed && parsed.productName) {
@@ -589,7 +549,7 @@ Return STRICT JSON:
           }
         }
       } catch (err) {
-        console.warn('Gemini fallback query error:', err);
+        console.warn('AI fallback query error:', err);
       }
     }
 
@@ -612,7 +572,7 @@ app.post('/api/ocr-scan', async (req: Request, res: Response) => {
 
     const cleanBase64 = imageBase64.includes(',') ? imageBase64.split(',')[1] : imageBase64;
 
-    if (ai) {
+    if (ai && GROQ_HAS_VISION) {
       const isNutritionLabel = mode === 'food-label' || mode === 'nutrition-label' || mode === 'back-label';
       const prompt = isNutritionLabel
         ? `Read this food packet ingredient table and nutrition facts.
@@ -644,7 +604,7 @@ Return JSON:
   "confidenceWarnings": ["..."]
 }`;
 
-      const response = await callGemini({
+      const response = await callAI({
         parts: [
           { inlineData: { mimeType: 'image/jpeg', data: cleanBase64 } },
           { text: prompt },
@@ -661,9 +621,11 @@ Return JSON:
       }
     }
 
-    // If vision model is not available or extraction returned nothing, return honest error
+    // If vision AI is unavailable or extraction returned nothing, return honest error
     return res.status(422).json({
-      error: 'Could not extract nutrition or ingredient table. Please capture a clear, well-lit photo of the label.'
+      error: GROQ_HAS_VISION
+        ? 'Could not extract nutrition or ingredient table. Please capture a clear, well-lit photo of the label.'
+        : 'Camera OCR is unavailable on this deployment (no vision model). Type the product name manually or use the barcode scanner instead.',
     });
   } catch (err: any) {
     console.error('Error in /api/ocr-scan:', err);
