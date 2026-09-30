@@ -1,5 +1,4 @@
 import React from 'react';
-import { motion } from 'motion/react';
 import { History, User, Home } from 'lucide-react';
 import { Language } from '../types';
 
@@ -38,20 +37,11 @@ export const BottomNav: React.FC<BottomNavProps> = ({ activeTab, onChangeTab, la
             <button
               key={tab.id}
               onClick={() => onChangeTab(tab.id)}
-              className="relative flex items-center justify-center py-2 px-4 rounded-full transition-all liquid-ripple"
+              className={`relative flex items-center justify-center py-2 px-4 rounded-full transition-all duration-200 liquid-ripple ${
+                isActive ? 'bg-[#161616] text-white shadow-xs' : 'text-[#737373] hover:text-[#161616]'
+              }`}
             >
-              {isActive && (
-                <motion.div
-                  layoutId="activeBottomNavCapsule"
-                  className="absolute inset-0 rounded-full liquid-glass-active-pill"
-                  transition={{ type: 'spring', stiffness: 450, damping: 32 }}
-                />
-              )}
-              <span
-                className={`relative z-10 flex items-center gap-1.5 transition-colors duration-150 ${
-                  isActive ? 'text-white font-medium' : 'text-[#737373] hover:text-[#161616]'
-                }`}
-              >
+              <span className="flex items-center gap-1.5">
                 <Icon className={`w-4 h-4 ${isActive ? 'stroke-[2.2]' : 'stroke-[1.8]'}`} />
                 <span className="text-xs">{tab.label}</span>
               </span>

@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
-import { motion } from 'motion/react';
 import { FoodAnalysisResult, ReportAnalysisResult, ScanHistoryItem, UserProfile } from '../../types';
 import { History, Trash2, ArrowRight, ShieldCheck, FileText, Camera } from 'lucide-react';
+import { MadeByFooter } from '../Common/MadeByFooter';
 
 interface HistoryViewProps {
   history: ScanHistoryItem[];
@@ -73,22 +73,11 @@ export const HistoryView: React.FC<HistoryViewProps> = ({
             <button
               key={tabKey}
               onClick={() => setFilter(tabKey)}
-              className="relative flex-1 py-1.5 text-xs font-semibold rounded-full transition-colors z-10 liquid-ripple"
+              className={`relative flex-1 py-1.5 text-xs font-semibold rounded-full transition-all duration-200 z-10 liquid-ripple ${
+                isSelected ? 'bg-[#161616] text-white shadow-xs' : 'text-[#737373] hover:text-[#161616]'
+              }`}
             >
-              {isSelected && (
-                <motion.div
-                  layoutId="activeHistoryFilter"
-                  className="absolute inset-0 rounded-full liquid-glass-active-pill"
-                  transition={{ type: 'spring', stiffness: 450, damping: 32 }}
-                />
-              )}
-              <span
-                className={`relative z-10 transition-colors duration-150 ${
-                  isSelected ? 'text-white' : 'text-[#737373] hover:text-[#161616]'
-                }`}
-              >
-                {label}
-              </span>
+              <span>{label}</span>
             </button>
           );
         })}
@@ -224,6 +213,9 @@ export const HistoryView: React.FC<HistoryViewProps> = ({
           })}
         </div>
       )}
+
+      {/* Made With ❤️ by Nirmalya ! with animated pumping heart */}
+      <MadeByFooter className="pt-2 pb-4" />
     </div>
   );
 };

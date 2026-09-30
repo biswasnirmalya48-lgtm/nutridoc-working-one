@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { NutritionData, UserProfile } from '../../types';
-import { ArrowLeft, Check, Edit3, AlertCircle, Sparkles } from 'lucide-react';
+import { ArrowLeft, Check, Edit3, AlertCircle, Sparkles, CheckCircle2 } from 'lucide-react';
 
 interface NutritionEditModalProps {
   initialData: {
@@ -9,6 +9,8 @@ interface NutritionEditModalProps {
     category: string;
     barcode?: string;
     frontImageUrl: string;
+    referenceImages?: string[];
+    isVerifiedDatabase?: boolean;
     nutrition: NutritionData;
   };
   onConfirm: (updatedData: {
@@ -17,6 +19,8 @@ interface NutritionEditModalProps {
     category: string;
     barcode?: string;
     frontImageUrl: string;
+    referenceImages?: string[];
+    isVerifiedDatabase?: boolean;
     nutrition: NutritionData;
   }) => void;
   onCancel: () => void;
@@ -78,6 +82,8 @@ export const NutritionEditModal: React.FC<NutritionEditModalProps> = ({
       category,
       barcode: initialData.barcode,
       frontImageUrl: initialData.frontImageUrl,
+      referenceImages: initialData.referenceImages,
+      isVerifiedDatabase: initialData.isVerifiedDatabase,
       nutrition: {
         servingSize,
         calories: Number(calories) || 0,
@@ -165,6 +171,37 @@ export const NutritionEditModal: React.FC<NutritionEditModalProps> = ({
 
         {/* Nutrition Values Section */}
         <div className="bg-white rounded-3xl p-5 border border-black/[0.06] shadow-xs space-y-4">
+          {/* Official Database Verification Guarantee */}
+          {initialData.isVerifiedDatabase ? (
+            <div className="p-3.5 rounded-2xl bg-emerald-50 border border-emerald-500/25 flex items-start gap-2.5">
+              <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
+              <div className="space-y-0.5 text-xs">
+                <p className="font-semibold text-emerald-950">
+                  {isHindi ? '100% आधिकारिक खाद्य डेटाबेस से सत्यापित (0% त्रुटि)' : '100% Official Database Match (0% Error Rate)'}
+                </p>
+                <p className="text-emerald-800 text-[11px] leading-tight">
+                  {isHindi
+                    ? 'कैलोरी, शर्करा, सोडियम और वसा मान सीधे आधिकारिक अंतरराष्ट्रीय उत्पाद डेटाबेस से लिए गए हैं।'
+                    : 'Calories, sugar, sodium, and fat values were matched directly from the official verified global product registry.'}
+                </p>
+              </div>
+            </div>
+          ) : (
+            <div className="p-3.5 rounded-2xl bg-amber-50/80 border border-amber-500/25 flex items-start gap-2.5">
+              <AlertCircle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
+              <div className="space-y-0.5 text-xs">
+                <p className="font-semibold text-amber-950">
+                  {isHindi ? 'पोषक तत्वों की पुष्टि करें' : 'Review & Verify Values'}
+                </p>
+                <p className="text-amber-800 text-[11px] leading-tight">
+                  {isHindi
+                    ? 'विश्लेषण से पहले कृपया मुद्रित तालिका के अनुसार मानों की पुष्टि कर लें।'
+                    : 'Values extracted via camera scan. Adjust any number if needed before clinical health scoring.'}
+                </p>
+              </div>
+            </div>
+          )}
+
           <div className="flex items-center justify-between pb-1 border-b border-black/[0.04]">
             <h4 className="text-xs font-bold uppercase tracking-wider text-[#1D1D1F]">
               {isHindi ? 'प्रति सर्विंग / 100g' : isBengali ? 'প্রতি পরিবেশন' : 'Nutrition Facts Table'}

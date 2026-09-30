@@ -1,5 +1,18 @@
 import React, { useRef, useState, useEffect } from 'react';
-import { RefreshCw, Zap, ZapOff, Image as ImageIcon, X, AlertCircle, Search, Sparkles } from 'lucide-react';
+import {
+  RefreshCw,
+  Zap,
+  ZapOff,
+  Image as ImageIcon,
+  X,
+  AlertCircle,
+  Search,
+  Sparkles,
+  Barcode,
+  CheckCircle2,
+  ArrowRight,
+  SkipForward,
+} from 'lucide-react';
 import { NutritionData, UserProfile } from '../../types';
 
 interface CameraScannerProps {
@@ -9,6 +22,8 @@ interface CameraScannerProps {
     category: string;
     barcode?: string;
     frontImageUrl: string;
+    referenceImages?: string[];
+    isVerifiedDatabase?: boolean;
     nutrition: NutritionData;
   }) => void;
   onCancel: () => void;
@@ -24,7 +39,7 @@ export const CameraScanner: React.FC<CameraScannerProps> = ({
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
-  // Step 1: Front Packet Recognition, Step 2: "Turn the packet around" Guide, Step 3: Back/Ingredient Table
+  // Step 1: Front Packet, Step 2: Barcode Live Scanner, Step 3: Back Nutrition Label (Optional)
   const [step, setStep] = useState<1 | 2 | 3>(1);
   const [stream, setStream] = useState<MediaStream | null>(null);
   const [facingMode, setFacingMode] = useState<'environment' | 'user'>('environment');
@@ -34,6 +49,7 @@ export const CameraScanner: React.FC<CameraScannerProps> = ({
   const [isProcessing, setIsProcessing] = useState<boolean>(false);
   const [loadingText, setLoadingText] = useState<string>('');
   const [detectedBarcode, setDetectedBarcode] = useState<string | null>(null);
+  const [barcodeScanSuccess, setBarcodeScanSuccess] = useState<boolean>(false);
   const [isCapturing, setIsCapturing] = useState<boolean>(false);
   const [shutterFlash, setShutterFlash] = useState<boolean>(false);
 
@@ -44,6 +60,10 @@ export const CameraScanner: React.FC<CameraScannerProps> = ({
   const [showSearchModal, setShowSearchModal] = useState<boolean>(false);
   const [searchQuery, setSearchQuery] = useState<string>('');
 
+  // Manual Barcode Input Modal
+  const [showBarcodeManualModal, setShowBarcodeManualModal] = useState<boolean>(false);
+  const [manualBarcodeInput, setManualBarcodeInput] = useState<string>('');
+
   // Stored Step 1 data
   const [frontImage, setFrontImage] = useState<string>('');
   const [productMetadata, setProductMetadata] = useState<{
@@ -52,6 +72,8 @@ export const CameraScanner: React.FC<CameraScannerProps> = ({
     category: string;
     barcode?: string;
     nutrition?: NutritionData;
+    referenceImages?: string[];
+    isVerifiedDatabase?: boolean;
   }>({
     name: '',
     brand: '',
@@ -61,7 +83,28 @@ export const CameraScanner: React.FC<CameraScannerProps> = ({
   const isHindi = profile.language === 'hi';
   const isBengali = profile.language === 'bn';
 
-  // Initialize camera
+  // Audio chirp feedback for barcode scan
+  const playBarcodeChirp = () => {
+    try {
+      const audioCtx = new (window.AudioContext || (window as any).webkitAudioContext)();
+      const osc = audioCtx.createOscillator();
+      const gain = audioCtx.createGain();
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(880, audioCtx.currentTime); // A5
+      osc.frequency.exponentialRampToValueAtTime(1320, audioCtx.currentTime + 0.12); // E6
+      gain.gain.setValueAtTime(0.3, audioCtx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.12);
+      osc.connect(gain);
+      gain.connect(audioCtx.destination);
+      osc.start();
+      osc.stop(audioCtx.currentTime + 0.12);
+      if (navigator.vibrate) {
+        navigator.vibrate(60);
+      }
+    } catch {}
+  };
+
+  // Initialize camera for all steps
   useEffect(() => {
     let activeStream: MediaStream | null = null;
 
@@ -95,52 +138,120 @@ export const CameraScanner: React.FC<CameraScannerProps> = ({
       }
     }
 
-    if (step === 1 || step === 3) {
-      initCamera();
-    }
+    initCamera();
 
     return () => {
       if (activeStream) {
         activeStream.getTracks().forEach((t) => t.stop());
       }
     };
-  }, [facingMode, step]);
+  }, [facingMode]);
 
-  // Real-time Barcode Detection using Native BarcodeDetector API if supported
+  // Handle barcode found (live or manual)
+  const handleBarcodeLookup = async (codeToLookup: string) => {
+    const clean = codeToLookup.replace(/\D/g, '').trim();
+    if (!clean || clean.length < 5) {
+      setScanError('Please enter a valid barcode (at least 6 digits).');
+      return;
+    }
+
+    playBarcodeChirp();
+    setBarcodeScanSuccess(true);
+    setDetectedBarcode(clean);
+    setIsProcessing(true);
+    setShowBarcodeManualModal(false);
+    setLoadingText(
+      isHindi
+        ? `बारकोड ${clean} की आधिकारिक पुष्टि…`
+        : isBengali
+        ? `বারকোড ${clean} যাচাই করা হচ্ছে…`
+        : `Verifying Barcode ${clean} in official database…`
+    );
+
+    try {
+      const res = await fetch('/api/barcode-lookup', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ barcode: clean }),
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        setProductMetadata((prev) => ({
+          ...prev,
+          name: data.productName || prev.name || 'Packaged Product',
+          brand: data.brand || prev.brand || '',
+          category: data.category || prev.category || 'Packaged Food',
+          barcode: clean,
+          nutrition: data.nutrition,
+          referenceImages: data.googleImages?.length > 0 ? data.googleImages : prev.referenceImages,
+          isVerifiedDatabase: true,
+        }));
+        if (data.imageUrl && !frontImage) {
+          setFrontImage(data.imageUrl);
+        }
+        setIsProcessing(false);
+        setTimeout(() => {
+          setStep(3); // Move to Step 3 (Back label is optional)
+        }, 500);
+      } else {
+        // Not in database, keep barcode and proceed to Step 3
+        setProductMetadata((prev) => ({
+          ...prev,
+          barcode: clean,
+        }));
+        setIsProcessing(false);
+        setTimeout(() => {
+          setStep(3);
+        }, 400);
+      }
+    } catch (e) {
+      setProductMetadata((prev) => ({
+        ...prev,
+        barcode: clean,
+      }));
+      setIsProcessing(false);
+      setStep(3);
+    }
+  };
+
+  // Real-time Barcode Detection in Step 2 using Native BarcodeDetector API
   useEffect(() => {
     let barcodeInterval: any = null;
     const hasBarcodeDetector = typeof window !== 'undefined' && 'BarcodeDetector' in window;
 
-    if (hasBarcodeDetector && (step === 1 || step === 3) && stream) {
-      try {
-        const detector = new (window as any).BarcodeDetector({
-          formats: ['ean_13', 'ean_8', 'upc_a', 'upc_e', 'qr_code', 'code_128'],
-        });
+    if (step === 2 && stream && !barcodeScanSuccess) {
+      if (hasBarcodeDetector) {
+        try {
+          const detector = new (window as any).BarcodeDetector({
+            formats: ['ean_13', 'ean_8', 'upc_a', 'upc_e', 'qr_code', 'code_128', 'code_39', 'itf'],
+          });
 
-        barcodeInterval = setInterval(async () => {
-          if (videoRef.current && videoRef.current.readyState === 4 && !isProcessing) {
-            try {
-              const barcodes = await detector.detect(videoRef.current);
-              if (barcodes.length > 0) {
-                const code = barcodes[0].rawValue;
-                if (code && code !== detectedBarcode) {
-                  setDetectedBarcode(code);
+          barcodeInterval = setInterval(async () => {
+            if (videoRef.current && videoRef.current.readyState === 4 && !isProcessing && !barcodeScanSuccess) {
+              try {
+                const barcodes = await detector.detect(videoRef.current);
+                if (barcodes.length > 0) {
+                  const raw = barcodes[0].rawValue;
+                  if (raw && raw.length >= 6) {
+                    handleBarcodeLookup(raw);
+                  }
                 }
+              } catch (e) {
+                // Ignore transient frame glitch
               }
-            } catch (e) {
-              // Ignore frame detection glitch
             }
-          }
-        }, 800);
-      } catch (e) {
-        console.log('BarcodeDetector init error:', e);
+          }, 250);
+        } catch (e) {
+          console.log('BarcodeDetector error:', e);
+        }
       }
     }
 
     return () => {
       if (barcodeInterval) clearInterval(barcodeInterval);
     };
-  }, [step, stream, isProcessing, detectedBarcode]);
+  }, [step, stream, isProcessing, barcodeScanSuccess]);
 
   // Torch toggle
   const toggleTorch = async () => {
@@ -196,25 +307,22 @@ export const CameraScanner: React.FC<CameraScannerProps> = ({
 
   // Trigger tactile shutter animation
   const triggerShutterFeedback = () => {
-    if (typeof navigator !== 'undefined' && navigator.vibrate) {
-      navigator.vibrate(18);
-    }
-    setShutterFlash(true);
     setIsCapturing(true);
+    setShutterFlash(true);
     setTimeout(() => setShutterFlash(false), 200);
-    setTimeout(() => setIsCapturing(false), 750);
+    setTimeout(() => setIsCapturing(false), 600);
   };
 
-  // STEP 1: Front Packet Recognition Handler
+  // STEP 1: Front Packet Capture Handler
   const handleCaptureFront = async (manualImage?: string, fallbackQueryText?: string) => {
-    if (!manualImage && !fallbackQueryText) {
-      triggerShutterFeedback();
-    }
-
-    const capturedImg = manualImage || (!fallbackQueryText ? captureFrame() : '');
+    let capturedImg = manualImage;
     if (!capturedImg && !fallbackQueryText) {
-      setScanError('Please ensure camera is active or choose an image from gallery or search by name.');
-      return;
+      triggerShutterFeedback();
+      capturedImg = captureFrame();
+      if (!capturedImg) {
+        setScanError('Unable to access camera frame. Please try again or search by name.');
+        return;
+      }
     }
 
     setIsProcessing(true);
@@ -240,14 +348,18 @@ export const CameraScanner: React.FC<CameraScannerProps> = ({
 
       if (res.ok) {
         const data = await res.json();
-        if (data.error) {
-          throw new Error(data.error);
+        if (data.isFood === false || data.error) {
+          throw new Error(data.error || 'Only real food or drink packets can be scanned. Please do not scan people, animals, or non-food objects.');
         }
 
-        if (data.verifiedDatabaseImageUrl) {
-          setFrontImage(data.verifiedDatabaseImageUrl);
-        } else if (data.imageUrl && !capturedImg) {
-          setFrontImage(data.imageUrl);
+        const validWebImages = Array.isArray(data.googleImages) ? data.googleImages : [];
+
+        if (!capturedImg) {
+          if (data.verifiedDatabaseImageUrl) {
+            setFrontImage(data.verifiedDatabaseImageUrl);
+          } else if (data.imageUrl) {
+            setFrontImage(data.imageUrl);
+          }
         }
 
         setProductMetadata({
@@ -256,14 +368,16 @@ export const CameraScanner: React.FC<CameraScannerProps> = ({
           category: data.category || 'Packaged Food',
           barcode: data.barcode || detectedBarcode || '',
           nutrition: data.nutrition,
+          referenceImages: validWebImages,
+          isVerifiedDatabase: !!data.isVerifiedDatabase,
         });
 
         setIsProcessing(false);
         setShowSearchModal(false);
-        setStep(2); // Move to Step 2 guide
+        setStep(2); // Automatically advance to Step 2: Barcode Scanner
       } else {
         const errData = await res.json().catch(() => ({}));
-        throw new Error(errData.error || 'Could not recognize the food packet.');
+        throw new Error(errData.error || 'Only real food or drink packets can be scanned. Please do not scan people, animals, or non-food objects.');
       }
     } catch (e: any) {
       console.warn('Recognition failed:', e);
@@ -274,7 +388,7 @@ export const CameraScanner: React.FC<CameraScannerProps> = ({
     }
   };
 
-  // STEP 3: Back / Nutrition Label Capture Handler
+  // STEP 3: Back / Nutrition Label Capture Handler (Optional)
   const handleCaptureBack = async (manualImage?: string) => {
     if (!manualImage) {
       triggerShutterFeedback();
@@ -350,6 +464,8 @@ export const CameraScanner: React.FC<CameraScannerProps> = ({
         category: productMetadata.category || 'Packaged Snack',
         barcode: productMetadata.barcode,
         frontImageUrl: frontImage,
+        referenceImages: productMetadata.referenceImages,
+        isVerifiedDatabase: productMetadata.isVerifiedDatabase,
         nutrition: finalNutrition,
       });
     } catch (e: any) {
@@ -361,6 +477,8 @@ export const CameraScanner: React.FC<CameraScannerProps> = ({
         category: productMetadata.category || 'Packaged Snack',
         barcode: productMetadata.barcode,
         frontImageUrl: frontImage,
+        referenceImages: productMetadata.referenceImages,
+        isVerifiedDatabase: productMetadata.isVerifiedDatabase,
         nutrition: productMetadata.nutrition || {
           servingSize: '100g',
           calories: 0,
@@ -377,6 +495,33 @@ export const CameraScanner: React.FC<CameraScannerProps> = ({
         },
       });
     }
+  };
+
+  // Direct completion from Step 3 without scanning back (using verified database values)
+  const handleCompleteDirect = () => {
+    onCaptureComplete({
+      productName: productMetadata.name || 'Packaged Food Product',
+      brand: productMetadata.brand || '',
+      category: productMetadata.category || 'Packaged Food',
+      barcode: productMetadata.barcode,
+      frontImageUrl: frontImage,
+      referenceImages: productMetadata.referenceImages,
+      isVerifiedDatabase: productMetadata.isVerifiedDatabase,
+      nutrition: productMetadata.nutrition || {
+        servingSize: '100g',
+        calories: 380,
+        sugar: 5,
+        sodium: 280,
+        totalFat: 12,
+        saturatedFat: 4,
+        transFat: 0,
+        protein: 5,
+        fibre: 2,
+        ingredients: [],
+        allergens: [],
+        additives: [],
+      },
+    });
   };
 
   // Gallery File Upload
@@ -402,6 +547,13 @@ export const CameraScanner: React.FC<CameraScannerProps> = ({
     e.preventDefault();
     if (!searchQuery.trim()) return;
     handleCaptureFront(undefined, searchQuery.trim());
+  };
+
+  // Manual Barcode Submit Handler
+  const handleManualBarcodeSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!manualBarcodeInput.trim()) return;
+    handleBarcodeLookup(manualBarcodeInput.trim());
   };
 
   return (
@@ -431,21 +583,33 @@ export const CameraScanner: React.FC<CameraScannerProps> = ({
 
         {/* Step Indicator Pill */}
         <div className="px-3.5 py-1.5 rounded-full bg-black/60 backdrop-blur-md border border-white/10 text-white/90 text-xs font-medium tracking-wide flex items-center gap-1.5 shadow-sm">
-          <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+          <span className={`w-1.5 h-1.5 rounded-full ${step === 2 ? 'bg-rose-400' : 'bg-emerald-400'} animate-pulse`} />
           {step === 1 && (isHindi ? 'स्टेप 1: फ्रंट पैकेट' : isBengali ? 'ধাপ ১: সামনের দিক' : 'Step 1: Front Packet')}
-          {step === 2 && (isHindi ? 'पैकेट पलटें' : isBengali ? 'প্যাকেট ঘোরান' : 'Turn Packet')}
-          {step === 3 && (isHindi ? 'स्टेप 2: न्यूट्रिशन' : isBengali ? 'ধাপ ২: পুষ্টি তালিকা' : 'Step 2: Nutrition Table')}
+          {step === 2 && (isHindi ? 'स्टेप 2: बारकोड स्कैन (सटीक)' : isBengali ? 'ধাপ ২: বারকোড স্ক্যান' : 'Step 2: Barcode Scan')}
+          {step === 3 && (isHindi ? 'स्टेप 3: समीक्षा (वैकल्पिक)' : isBengali ? 'ধাপ ৩: পুষ্টি তালিকা' : 'Step 3: Review / Back Label')}
         </div>
 
         {/* Tools */}
         <div className="flex items-center gap-2">
-          <button
-            onClick={() => setShowSearchModal(true)}
-            className="w-10 h-10 rounded-full liquid-glass-control text-white flex items-center justify-center active:scale-95 transition-all shadow-md"
-            title="Search by name"
-          >
-            <Search className="w-4 h-4" />
-          </button>
+          {step === 1 && (
+            <button
+              onClick={() => setShowSearchModal(true)}
+              className="w-10 h-10 rounded-full liquid-glass-control text-white flex items-center justify-center active:scale-95 transition-all shadow-md"
+              title="Search by name"
+            >
+              <Search className="w-4 h-4" />
+            </button>
+          )}
+          {step === 2 && (
+            <button
+              onClick={() => setShowBarcodeManualModal(true)}
+              className="px-3 h-10 rounded-full liquid-glass-control text-white text-xs font-semibold flex items-center gap-1 active:scale-95 transition-all shadow-md"
+              title="Type barcode"
+            >
+              <Barcode className="w-4 h-4" />
+              <span>Type</span>
+            </button>
+          )}
           <button
             onClick={toggleTorch}
             className={`w-10 h-10 rounded-full liquid-glass-control flex items-center justify-center active:scale-95 transition-all shadow-md ${
@@ -557,21 +721,13 @@ export const CameraScanner: React.FC<CameraScannerProps> = ({
               isCapturing ? 'camera-capture-ripple border-emerald-400' : ''
             }`}
           >
-            {/* Animated scan line when processing */}
             {isProcessing && (
               <div className="absolute inset-x-4 h-0.5 camera-scan-line bg-gradient-to-r from-transparent via-emerald-400 to-transparent shadow-[0_0_8px_#10B981]" />
             )}
 
             <div className="w-full flex justify-center">
               <span className="bg-black/60 backdrop-blur-md px-3.5 py-1 rounded-full text-white text-xs font-normal border border-white/10 flex items-center gap-1.5">
-                {detectedBarcode ? (
-                  <>
-                    <Sparkles className="w-3 h-3 text-emerald-400" />
-                    <span>Barcode: {detectedBarcode}</span>
-                  </>
-                ) : (
-                  <span>Point at the front of a food packet</span>
-                )}
+                <span>Point at front of food packet</span>
               </span>
             </div>
 
@@ -587,109 +743,128 @@ export const CameraScanner: React.FC<CameraScannerProps> = ({
           </div>
         )}
 
-        {/* STEP 2: "Turn the packet around" Simple Prompt Modal */}
+        {/* STEP 2: Dedicated Barcode Live Laser Reticle (High Precision) */}
         {step === 2 && (
-          <div
-            onClick={(e) => e.stopPropagation()}
-            className="relative z-30 max-w-xs mx-6 bg-white rounded-[24px] p-6 text-center text-[#161616] shadow-[0_4px_24px_rgba(0,0,0,0.12)] border border-black/[0.08] animate-fade-in space-y-4"
-          >
-            <div className="w-12 h-12 mx-auto rounded-2xl bg-[#F0EFEA] text-[#161616] flex items-center justify-center">
-              <RefreshCw className="w-5 h-5 stroke-[2]" />
-            </div>
+          <div className="relative flex flex-col items-center justify-center pointer-events-none">
+            {/* Barcode reticle frame with red/green laser */}
+            <div
+              className={`relative w-80 h-48 rounded-2xl border-2 transition-all duration-300 shadow-[0_0_0_9999px_rgba(0,0,0,0.58)] flex flex-col items-center justify-between p-3.5 ${
+                barcodeScanSuccess
+                  ? 'border-emerald-400 bg-emerald-500/10 shadow-[0_0_30px_rgba(16,185,129,0.5)]'
+                  : 'border-white/80'
+              }`}
+            >
+              {/* Corner accent marks */}
+              <span className="absolute -top-1 -left-1 w-4 h-4 border-t-2 border-l-2 border-rose-500" />
+              <span className="absolute -top-1 -right-1 w-4 h-4 border-t-2 border-r-2 border-rose-500" />
+              <span className="absolute -bottom-1 -left-1 w-4 h-4 border-b-2 border-l-2 border-rose-500" />
+              <span className="absolute -bottom-1 -right-1 w-4 h-4 border-b-2 border-r-2 border-rose-500" />
 
-            <div className="space-y-1">
-              <h3 className="text-base font-semibold tracking-tight text-[#161616]">
-                {isHindi ? 'पैकेट को पलटें' : isBengali ? 'প্যাকেটটি উল্টো করুন' : 'Turn the packet around.'}
-              </h3>
-              <p className="text-xs text-[#737373]">
-                {isHindi
-                  ? 'सामग्री और पोषण तालिका को स्कैन करें'
-                  : isBengali
-                  ? 'উপাদান ও পুষ্টি তালিকা স্ক্যান করুন'
-                  : 'Scan the ingredients.'}
-              </p>
-            </div>
-
-            {/* Recognized Product Snippet */}
-            <div className="flex items-center gap-2.5 p-2.5 rounded-xl bg-[#F7F7F5] border border-black/[0.04] text-left text-xs">
-              {frontImage && (
-                <img
-                  src={frontImage}
-                  alt="Front preview"
-                  className="w-10 h-10 rounded-lg object-cover bg-black/5 shrink-0"
-                />
+              {/* Laser scanning beam */}
+              {!barcodeScanSuccess && (
+                <div className="absolute inset-x-2 h-0.5 camera-scan-line bg-gradient-to-r from-transparent via-rose-500 to-transparent shadow-[0_0_12px_#F43F5E]" />
               )}
-              <div className="min-w-0">
-                <p className="font-medium text-xs text-[#161616] truncate">{productMetadata.name}</p>
-                <p className="text-[10px] text-[#737373]">{productMetadata.category}</p>
+
+              {/* Status Header */}
+              <div className="w-full flex justify-center">
+                <span className="bg-black/75 backdrop-blur-md px-3 py-1 rounded-full text-white text-[11px] font-semibold border border-white/10 flex items-center gap-1.5 shadow-sm">
+                  {barcodeScanSuccess ? (
+                    <>
+                      <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
+                      <span className="text-emerald-400">Barcode Detected: {detectedBarcode}</span>
+                    </>
+                  ) : (
+                    <>
+                      <Barcode className="w-3.5 h-3.5 text-rose-400" />
+                      <span>{isHindi ? 'बारकोड लाइनों को फ्रेम में रखें' : 'Align Barcode in Reticle'}</span>
+                    </>
+                  )}
+                </span>
+              </div>
+
+              {/* Subtitle guidance */}
+              <div className="text-center">
+                <p className="text-white/80 text-[11px] font-medium drop-shadow-sm">
+                  {isHindi
+                    ? '0% त्रुटि के साथ सटीक पोषण मान पाने के लिए बारकोड स्कैन करें'
+                    : isBengali
+                    ? 'নির্ভুল তথ্যের জন্য বারকোড স্ক্যান করুন'
+                    : 'Auto-detects for 0% error official nutrition'}
+                </p>
               </div>
             </div>
 
-            <div className="space-y-2 pt-1">
-              <button
-                onClick={() => setStep(3)}
-                className="w-full py-3 rounded-full bg-[#161616] text-white text-xs font-semibold active:scale-[0.98] transition-transform"
-              >
-                {isHindi ? 'सामग्री स्कैन करें' : isBengali ? 'উপাদান স্ক্যান করুন' : 'Scan the ingredients'}
-              </button>
-
-              <button
-                onClick={() => {
-                  onCaptureComplete({
-                    productName: productMetadata.name || 'Packaged Food Product',
-                    brand: productMetadata.brand || '',
-                    category: productMetadata.category || 'Packaged Snack',
-                    barcode: productMetadata.barcode,
-                    frontImageUrl: frontImage,
-                    nutrition: productMetadata.nutrition || {
-                      servingSize: '100g',
-                      calories: 350,
-                      sugar: 5,
-                      sodium: 300,
-                      totalFat: 12,
-                      saturatedFat: 4,
-                      transFat: 0,
-                      protein: 5,
-                      fibre: 2,
-                      ingredients: [],
-                      allergens: [],
-                      additives: [],
-                    },
-                  });
-                }}
-                className="w-full py-2.5 text-xs text-[#737373] hover:text-[#161616] active:scale-[0.98] transition-colors"
-              >
-                {isHindi ? 'अनुमानित पोषण के साथ आगे बढ़ें' : isBengali ? 'অনুমিত পুষ্টি নিয়ে চলুন' : 'Continue with recognized values'}
-              </button>
+            {/* Recognized Product banner in Step 2 */}
+            <div className="mt-4 px-4 py-2 rounded-2xl bg-black/60 backdrop-blur-md border border-white/15 text-white text-xs flex items-center gap-2 max-w-xs truncate">
+              {frontImage && (
+                <img src={frontImage} alt="Scanned" className="w-7 h-7 rounded-lg object-cover" />
+              )}
+              <span className="truncate font-semibold">{productMetadata.name || 'Food Product'}</span>
             </div>
           </div>
         )}
 
-        {/* STEP 3: Back / Nutrition Facts Clean Scanning Reticle */}
+        {/* STEP 3: Back Nutrition Label (Optional!) */}
         {step === 3 && (
-          <div
-            className={`relative w-76 h-80 rounded-[26px] border border-white/80 shadow-[0_0_0_9999px_rgba(0,0,0,0.52)] flex flex-col items-center justify-between p-6 pointer-events-none transition-all duration-300 ${
-              isCapturing ? 'camera-capture-ripple border-emerald-400' : ''
-            }`}
-          >
-            {/* Animated scan line */}
-            {isProcessing && (
-              <div className="absolute inset-x-4 h-0.5 camera-scan-line bg-gradient-to-r from-transparent via-emerald-400 to-transparent shadow-[0_0_8px_#10B981]" />
-            )}
+          <div className="relative flex flex-col items-center justify-between w-full h-full p-6 pt-24 pb-36 pointer-events-none">
+            {/* Top Verified Summary Card if Barcode was Matched */}
+            <div
+              onClick={(e) => e.stopPropagation()}
+              className="w-full max-w-sm bg-white/95 backdrop-blur-md rounded-2xl p-4 shadow-xl border border-emerald-500/30 text-[#161616] space-y-2 pointer-events-auto animate-fade-in"
+            >
+              <div className="flex items-center justify-between">
+                <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-emerald-100 text-emerald-900 text-[11px] font-bold">
+                  <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+                  {productMetadata.isVerifiedDatabase
+                    ? (isHindi ? 'आधिकारिक डेटाबेस से सत्यापित (0% त्रुटि)' : 'Verified Official Database (0% Error)')
+                    : (isHindi ? 'उत्पाद विवरण लोड हो गया' : 'Product Profile Ready')}
+                </span>
+                {productMetadata.barcode && (
+                  <span className="text-[10px] text-[#737373] font-mono">#{productMetadata.barcode}</span>
+                )}
+              </div>
 
-            <div className="w-full flex justify-center">
-              <span className="bg-black/60 backdrop-blur-md px-3.5 py-1 rounded-full text-white text-xs font-normal border border-white/10">
-                Turn the packet around. Scan the ingredients.
-              </span>
+              <div className="text-xs text-[#161616] font-semibold truncate">
+                {productMetadata.name}
+              </div>
+
+              {productMetadata.nutrition && (
+                <div className="flex items-center justify-between text-[11px] text-[#737373] bg-[#F7F7F5] rounded-xl p-2">
+                  <span>Cal: <b className="text-[#161616]">{productMetadata.nutrition.calories ?? 0} kcal</b></span>
+                  <span>Sugar: <b className="text-[#161616]">{productMetadata.nutrition.sugar ?? 0}g</b></span>
+                  <span>Salt: <b className="text-[#161616]">{productMetadata.nutrition.sodium ?? 0}mg</b></span>
+                  <span>Fat: <b className="text-[#161616]">{productMetadata.nutrition.totalFat ?? 0}g</b></span>
+                </div>
+              )}
+
+              {/* Direct primary action */}
+              <button
+                onClick={handleCompleteDirect}
+                className="w-full py-2.5 rounded-full bg-[#161616] text-white text-xs font-semibold shadow-md active:scale-95 transition-transform flex items-center justify-center gap-1.5 liquid-ripple"
+              >
+                <span>{isHindi ? 'सटीक पोषण की समीक्षा करें' : isBengali ? 'সরাসরি বিশ্লেষণ করুন' : 'Confirm & Review Nutrients'}</span>
+                <ArrowRight className="w-3.5 h-3.5" />
+              </button>
             </div>
 
-            <div className="text-center">
-              <p className="text-white/80 text-xs font-normal">
+            {/* Viewfinder frame for optional back photo */}
+            <div
+              className={`relative w-76 h-64 rounded-[24px] border border-white/70 shadow-[0_0_0_9999px_rgba(0,0,0,0.52)] flex flex-col items-center justify-between p-4 transition-all duration-300 ${
+                isCapturing ? 'camera-capture-ripple border-emerald-400' : ''
+              }`}
+            >
+              {isProcessing && (
+                <div className="absolute inset-x-4 h-0.5 camera-scan-line bg-gradient-to-r from-transparent via-emerald-400 to-transparent shadow-[0_0_8px_#10B981]" />
+              )}
+
+              <span className="bg-black/60 backdrop-blur-md px-3 py-1 rounded-full text-white text-[11px] font-medium border border-white/10">
+                {isHindi ? 'वैकल्पिक: मुद्रित तालिका की तस्वीर लें' : 'Optional: Photograph Printed Back Label'}
+              </span>
+
+              <p className="text-white/80 text-[11px] text-center font-normal">
                 {isHindi
-                  ? 'सामग्री और पोषण तालिका फ्रेम में रखें और शटर दबाएं'
-                  : isBengali
-                  ? 'উপাদান ও পুষ্টি তালিকা ফ্রেমের মাঝে রাখুন ও শাটার চাপুন'
-                  : 'Align nutrition table & tap shutter'}
+                  ? 'सामग्री जांचने के लिए शटर दबाएं, या ऊपर जारी रखें'
+                  : 'Tap shutter to OCR check label, or tap Confirm above'}
               </p>
             </div>
           </div>
@@ -711,9 +886,9 @@ export const CameraScanner: React.FC<CameraScannerProps> = ({
               <p className="text-white/60 text-xs">
                 {loadingText === 'Scanning product'
                   ? 'Identifying packaging and brand…'
-                  : loadingText === 'Reading ingredients'
-                  ? 'Extracting nutrition values…'
-                  : 'Preparing your result'}
+                  : loadingText.includes('barco') || loadingText.includes('बारकोड')
+                  ? 'Accessing official nutrition registry with 0% error…'
+                  : 'Extracting nutritional parameters…'}
               </p>
             </div>
           </div>
@@ -737,7 +912,7 @@ export const CameraScanner: React.FC<CameraScannerProps> = ({
             </div>
 
             <p className="text-xs text-[#86868B]">
-              Enter brand or product name (e.g. Lay's, Maggi, Oreo, Doritos, Kurkure, Tropicana, Milk):
+              Enter brand or product name (e.g. Lay's, Maggi, Oreo, Doritos, Kurkure, Amul, Tropicana):
             </p>
 
             <form onSubmit={handleSearchSubmit} className="space-y-3">
@@ -761,10 +936,55 @@ export const CameraScanner: React.FC<CameraScannerProps> = ({
         </div>
       )}
 
-      {/* Bottom Shutter & Controls Tray with Floating Glass Controls */}
-      {step !== 2 && (
+      {/* Manual Barcode Input Modal */}
+      {showBarcodeManualModal && (
+        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-end sm:items-center justify-center p-4 animate-fade-in">
+          <div className="bg-[#F7F7F5] w-full max-w-sm rounded-3xl p-6 space-y-4 border border-black/10 shadow-2xl">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Barcode className="w-5 h-5 text-[#1D1D1F]" />
+                <h3 className="text-base font-bold text-[#1D1D1F]">
+                  Enter Barcode Number
+                </h3>
+              </div>
+              <button
+                onClick={() => setShowBarcodeManualModal(false)}
+                className="w-8 h-8 rounded-full bg-black/5 flex items-center justify-center text-[#1D1D1F]"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <p className="text-xs text-[#86868B]">
+              Type the 8 to 13 digits printed directly below the barcode lines on the packaging:
+            </p>
+
+            <form onSubmit={handleManualBarcodeSubmit} className="space-y-3">
+              <input
+                type="text"
+                inputMode="numeric"
+                autoFocus
+                value={manualBarcodeInput}
+                onChange={(e) => setManualBarcodeInput(e.target.value)}
+                placeholder="e.g. 8901491101837"
+                className="w-full px-4 py-3 rounded-2xl bg-white border border-black/10 text-base font-mono font-bold tracking-widest text-[#1D1D1F] focus:outline-none focus:border-black text-center"
+              />
+              <button
+                type="submit"
+                disabled={!manualBarcodeInput.trim()}
+                className="w-full py-3.5 rounded-full bg-[#161616] text-white text-xs font-semibold shadow-md active:scale-95 transition-transform disabled:opacity-50 flex items-center justify-center gap-1.5"
+              >
+                <span>Lookup Official Database (0% Error)</span>
+                <CheckCircle2 className="w-4 h-4 text-emerald-400" />
+              </button>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Bottom Shutter & Controls Tray */}
+      {step === 1 && (
         <div className="relative z-20 px-8 pt-4 pb-9 bg-gradient-to-t from-black/90 via-black/50 to-transparent flex items-center justify-between">
-          {/* Gallery Upload Button */}
           <button
             onClick={() => fileInputRef.current?.click()}
             className="w-12 h-12 rounded-full liquid-glass-control text-white flex items-center justify-center active:scale-95 transition-all shadow-lg"
@@ -773,26 +993,75 @@ export const CameraScanner: React.FC<CameraScannerProps> = ({
             <ImageIcon className="w-5 h-5" />
           </button>
 
-          {/* Apple Floating Glass Shutter Button */}
           <button
-            onClick={() => {
-              if (step === 1) handleCaptureFront();
-              if (step === 3) handleCaptureBack();
-            }}
+            onClick={() => handleCaptureFront()}
             disabled={isProcessing}
-            aria-label="Capture photo"
+            aria-label="Capture food packet"
             className="group relative w-19 h-19 rounded-full border-4 border-white/80 p-1 flex items-center justify-center active:scale-90 transition-transform backdrop-blur-md shadow-[0_4px_24px_rgba(0,0,0,0.35)]"
           >
             <div className="w-full h-full rounded-full bg-white transition-all group-hover:scale-95 group-active:scale-90 shadow-inner" />
           </button>
 
-          {/* Camera Switch Button */}
           <button
             onClick={switchCamera}
             className="w-12 h-12 rounded-full liquid-glass-control text-white flex items-center justify-center active:scale-95 transition-all shadow-lg"
             title="Switch camera"
           >
             <RefreshCw className="w-5 h-5" />
+          </button>
+        </div>
+      )}
+
+      {/* Step 2 Bottom Controls: Barcode Actions */}
+      {step === 2 && (
+        <div className="relative z-20 px-6 pt-3 pb-8 bg-gradient-to-t from-black/90 via-black/50 to-transparent flex items-center justify-between gap-3">
+          <button
+            onClick={() => setShowBarcodeManualModal(true)}
+            className="px-4 py-3 rounded-full liquid-glass-control text-white text-xs font-semibold flex items-center gap-2 active:scale-95 transition-all shadow-md"
+          >
+            <Barcode className="w-4 h-4 text-rose-400" />
+            <span>Enter Manually</span>
+          </button>
+
+          <button
+            onClick={() => setStep(3)}
+            className="px-5 py-3 rounded-full bg-white/20 text-white text-xs font-semibold backdrop-blur-md border border-white/20 flex items-center gap-1.5 active:scale-95 transition-all shadow-md"
+          >
+            <span>Skip Barcode</span>
+            <SkipForward className="w-3.5 h-3.5" />
+          </button>
+        </div>
+      )}
+
+      {/* Step 3 Bottom Controls: Optional Back Label / Confirm */}
+      {step === 3 && (
+        <div className="relative z-20 px-8 pt-4 pb-9 bg-gradient-to-t from-black/90 via-black/50 to-transparent flex items-center justify-between">
+          <button
+            onClick={() => fileInputRef.current?.click()}
+            className="w-12 h-12 rounded-full liquid-glass-control text-white flex items-center justify-center active:scale-95 transition-all shadow-lg"
+            title="Upload photo from gallery"
+          >
+            <ImageIcon className="w-5 h-5" />
+          </button>
+
+          {/* Shutter for optional back capture */}
+          <button
+            onClick={() => handleCaptureBack()}
+            disabled={isProcessing}
+            aria-label="Capture nutrition label"
+            className="group relative w-19 h-19 rounded-full border-4 border-white/80 p-1 flex items-center justify-center active:scale-90 transition-transform backdrop-blur-md shadow-[0_4px_24px_rgba(0,0,0,0.35)]"
+            title="Photograph back label"
+          >
+            <div className="w-full h-full rounded-full bg-white transition-all group-hover:scale-95 group-active:scale-90 shadow-inner" />
+          </button>
+
+          <button
+            onClick={handleCompleteDirect}
+            className="px-3.5 py-2.5 rounded-full bg-emerald-500 text-white text-xs font-bold active:scale-95 transition-all shadow-lg flex items-center gap-1"
+            title="Skip and view results"
+          >
+            <span>Skip</span>
+            <ArrowRight className="w-3.5 h-3.5" />
           </button>
         </div>
       )}

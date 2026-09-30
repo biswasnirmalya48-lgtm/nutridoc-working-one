@@ -75,7 +75,7 @@ export function evaluateFoodNutrition(
   if (fibreLvl === 'High') score += 12;
   else if (fibreLvl === 'Medium') score += 5;
 
-  // Additive / ultra-processed check from ingredients
+  // --- ADVANCED CLINICAL INGREDIENT & NOVA ULTRA-PROCESSED ANALYSIS ---
   const safeIngredientsList = Array.isArray(nutrition.ingredients)
     ? nutrition.ingredients
     : typeof nutrition.ingredients === 'string'
@@ -88,22 +88,231 @@ export function evaluateFoodNutrition(
     : [];
 
   const ingredientsStr = safeIngredientsList.join(' ').toLowerCase();
-  const hasPalmOil = ingredientsStr.includes('palm oil') || ingredientsStr.includes('palmolein');
-  const hasArtificialPreservative = ingredientsStr.includes('e211') || ingredientsStr.includes('benzoate') || ingredientsStr.includes('artificial');
-  const hasRefinedFlour = ingredientsStr.includes('maida') || ingredientsStr.includes('refined wheat');
 
-  if (hasPalmOil) score -= 6;
-  if (hasRefinedFlour) score -= 5;
-  if (hasArtificialPreservative) score -= 4;
+  // Ingredient Quality Evaluation
+  const ingredientFlags: { name: string; type: 'harmful' | 'beneficial' | 'neutral'; description: string }[] = [];
+  const harmfulIngredients: string[] = [];
+  const beneficialIngredients: string[] = [];
+  let ingredientScoreDelta = 0;
+
+  // 1. Harmful & Low-Grade Fats & Oils
+  if (/(palm oil|palmolein|hydrogenated vegetable|vanaspati|interesterified|fractionated palm)/i.test(ingredientsStr)) {
+    ingredientScoreDelta -= 12;
+    harmfulIngredients.push('Palm Oil / Industrial Fats');
+    ingredientFlags.push({
+      name: profile.language === 'hi' ? 'पाम ऑयल / हाइड्रोजनेटेड फैट' : 'Palm Oil / Industrial Fats',
+      type: 'harmful',
+      description: profile.language === 'hi'
+        ? 'धमनियों में रुकावट और एलडीएल कोलेस्ट्रॉल बढ़ाने वाला अस्वास्थ्यकर संतृप्त तेल।'
+        : 'High atherogenic saturated fat linked to arterial plaque and elevated LDL cholesterol.',
+    });
+  }
+
+  // 2. High Glycemic Industrial Sugars & Liquid Glucose
+  if (/(high fructose corn syrup|hfcs|invert sugar|liquid glucose|corn syrup solids|maltodextrin|dextrose)/i.test(ingredientsStr)) {
+    ingredientScoreDelta -= 9;
+    harmfulIngredients.push('Maltodextrin / HFCS / Invert Sugars');
+    ingredientFlags.push({
+      name: profile.language === 'hi' ? 'माल्टोडेक्सट्रिन / हाई फ्रुक्टोज कॉर्न सिरप' : 'Industrial Sugars (Maltodextrin / HFCS)',
+      type: 'harmful',
+      description: profile.language === 'hi'
+        ? 'रक्त शर्करा (ब्लड शुगर) को तुरंत तेजी से बढ़ाने वाला प्रोसेस्ड ग्लूकोज।'
+        : 'Ultra-refined sweetener causing rapid blood glucose spikes and hepatic fat storage.',
+    });
+  }
+
+  // 3. Refined Bleached Flour (Maida)
+  if (/(maida|refined wheat|bleached flour|degermed corn|modified starch)/i.test(ingredientsStr)) {
+    ingredientScoreDelta -= 7;
+    harmfulIngredients.push('Refined Flour (Maida)');
+    ingredientFlags.push({
+      name: profile.language === 'hi' ? 'रिफाइंड मैदा' : 'Refined Wheat Flour (Maida)',
+      type: 'harmful',
+      description: profile.language === 'hi'
+        ? 'चोकर और फाइबर से रहित रिफाइंड आटा, जो आंतों के लिए भारी और उच्च ग्लाइसेमिक है।'
+        : 'Stripped of dietary fibre and germ; digests rapidly as simple starch.',
+    });
+  }
+
+  // 4. Flavor Enhancers & Excitotoxins (MSG, Disodium Guanylate/Inosinate, HVP)
+  if (/(monosodium glutamate|msg|e621|disodium inosinate|e631|disodium guanylate|e627|hydrolyzed vegetable protein|yeast extract)/i.test(ingredientsStr)) {
+    ingredientScoreDelta -= 7;
+    harmfulIngredients.push('Flavor Enhancers (MSG / E621 / E627)');
+    ingredientFlags.push({
+      name: profile.language === 'hi' ? 'स्वाद बढ़ाने वाले रसायन (MSG / E621 / E627)' : 'Flavor Enhancers (MSG / E621/E631)',
+      type: 'harmful',
+      description: profile.language === 'hi'
+        ? 'अतिरिक्त भूख और अधिक खाने की आदत डालने वाले रासायनिक फ्लेवर बूस्टर।'
+        : 'Excitotoxins engineered to induce hyper-palatability and compulsive snacking.',
+    });
+  }
+
+  // 5. Harmful Chemical Preservatives (TBHQ, BHA, BHT, Benzoates, Nitrites)
+  if (/(tbhq|e319|bha|e320|bht|e321|sodium benzoate|e211|potassium sorbate|e202|sodium nitrite|e250|sodium nitrate|e251)/i.test(ingredientsStr)) {
+    ingredientScoreDelta -= 10;
+    harmfulIngredients.push('Chemical Preservatives (TBHQ / Benzoates)');
+    ingredientFlags.push({
+      name: profile.language === 'hi' ? 'रासायनिक प्रिजर्वेटिव (TBHQ / सोडियम बेंजोएट)' : 'Chemical Preservatives (TBHQ / E211 / E319)',
+      type: 'harmful',
+      description: profile.language === 'hi'
+        ? 'कोशिकाओं पर तनाव और आंतों के बैक्टीरिया को नुकसान पहुंचाने वाले रासायनिक संरक्षक।'
+        : 'Synthetic preservatives linked to gut inflammation and oxidative cellular stress.',
+    });
+  }
+
+  // 6. Artificial Synthetic Colors & 4-MEI Caramel
+  if (/(tartrazine|e102|sunset yellow|e110|allura red|e129|caramel color iv|e150d|ponceau|e124|brilliant blue|e133)/i.test(ingredientsStr)) {
+    ingredientScoreDelta -= 8;
+    harmfulIngredients.push('Synthetic Dyes / Caramel IV (E150d)');
+    ingredientFlags.push({
+      name: profile.language === 'hi' ? 'कृत्रिम रंग (E150d / टार्ट्राजीन / रेड 40)' : 'Synthetic Colors (E150d / Tartrazine / Allura Red)',
+      type: 'harmful',
+      description: profile.language === 'hi'
+        ? 'पेट्रोलियम आधारित कृत्रिम रंग जिसमें 4-MEI केमिकल अशुद्धियां हो सकती हैं।'
+        : 'Petrochemical artificial food dyes and Class IV ammoniated caramel coloring.',
+    });
+  }
+
+  // 7. Industrial Emulsifiers (Carrageenan, Polysorbate 80, CMC)
+  if (/(carrageenan|e407|polysorbate 80|e433|carboxymethylcellulose|e466)/i.test(ingredientsStr)) {
+    ingredientScoreDelta -= 6;
+    harmfulIngredients.push('Industrial Emulsifiers (Carrageenan / CMC)');
+    ingredientFlags.push({
+      name: profile.language === 'hi' ? 'इमल्सीफायर्स (कैरेजीनन / CMC / E407)' : 'Gut-Disrupting Emulsifiers (Carrageenan / E407)',
+      type: 'harmful',
+      description: profile.language === 'hi'
+        ? 'आंतों की सुरक्षात्मक परत को पतला करने वाले औद्योगिक पायसीकारी रसायन।'
+        : 'Industrial stabilizers shown to disturb gut mucosal lining integrity.',
+    });
+  }
+
+  // 8. Artificial Intense Sweeteners
+  if (/(aspartame|e951|sucralose|e955|acesulfame|ace-k|e950|saccharin|e954)/i.test(ingredientsStr)) {
+    ingredientScoreDelta -= 6;
+    harmfulIngredients.push('Artificial Sweeteners (Sucralose / Aspartame)');
+    ingredientFlags.push({
+      name: profile.language === 'hi' ? 'कृत्रिम स्वीटनर (सुक्रालोज़ / एस्पार्टेम)' : 'Intense Artificial Sweeteners (Sucralose / Aspartame)',
+      type: 'harmful',
+      description: profile.language === 'hi'
+        ? 'आंतों के माइक्रोबायोम को असंतुलित करने वाले शून्य-कैलोरी रासायनिक स्वीटनर।'
+        : 'Non-nutritive chemical sweeteners that disrupt healthy gut flora and metabolic signals.',
+    });
+  }
+
+  // --- BENEFICIAL WHOLE INGREDIENTS ---
+  // 1. Whole Grains & Millets
+  if (/(whole wheat|rolled oats|oat flour|quinoa|brown rice|ragi|foxtail millet|jowar|bajra|barley|whole grain)/i.test(ingredientsStr)) {
+    ingredientScoreDelta += 9;
+    beneficialIngredients.push('100% Whole Grains / Millets');
+    ingredientFlags.push({
+      name: profile.language === 'hi' ? 'साबुत अनाज और बाजरा / मिलेट्स' : '100% Whole Grains & Millets',
+      type: 'beneficial',
+      description: profile.language === 'hi'
+        ? 'अखंड चोकर और रोगाणु से भरपूर; धीमा पचने वाला और ऊर्जा प्रदान करने वाला प्राकृतिक फाइबर।'
+        : 'Intact whole grain matrix delivering sustained complex carbs and beta-glucan fiber.',
+    });
+  }
+
+  // 2. Real Nuts & Seeds
+  if (/(almond|walnut|chia seed|flaxseed|pumpkin seed|sunflower seed|sesame seed|cashew|pistachio)/i.test(ingredientsStr)) {
+    ingredientScoreDelta += 9;
+    beneficialIngredients.push('Real Nuts & Omega Seeds');
+    ingredientFlags.push({
+      name: profile.language === 'hi' ? 'असली मेवे और बीज (बादाम / चिया / अलसी)' : 'Real Nuts & Omega Seeds',
+      type: 'beneficial',
+      description: profile.language === 'hi'
+        ? 'हृदय के लिए लाभकारी ओमेगा फैटी एसिड, विटामिन ई और प्राकृतिक पौधे के प्रोटीन का स्रोत।'
+        : 'Rich natural reservoir of heart-healthy polyunsaturated fatty acids and micronutrients.',
+    });
+  }
+
+  // 3. Real Fruits, Berries & Vegetables
+  if (/(apple|berry|strawberry|blueberry|banana|date|raisin|spinach|tomato|carrot|beetroot|orange|lemon)/i.test(ingredientsStr)) {
+    ingredientScoreDelta += 8;
+    beneficialIngredients.push('Natural Fruits & Vegetables');
+    ingredientFlags.push({
+      name: profile.language === 'hi' ? 'प्राकृतिक फल व सब्जियां' : 'Natural Fruits & Vegetables',
+      type: 'beneficial',
+      description: profile.language === 'hi'
+        ? 'प्राकृतिक एंटीऑक्सीडेंट, पॉलीफेनोल और आवश्यक सुरक्षात्मक विटामिन।'
+        : 'Real botanical antioxidants, polyphenols, and protective phytonutrients.',
+    });
+  }
+
+  // 4. Plant & Clean Proteins
+  if (/(lentil|chickpea|chana|moong|edamame|pea protein|whey protein isolate)/i.test(ingredientsStr)) {
+    ingredientScoreDelta += 7;
+    beneficialIngredients.push('Clean Protein Source');
+    ingredientFlags.push({
+      name: profile.language === 'hi' ? 'प्राकृतिक दालें और प्रोटीन' : 'Clean Protein Source',
+      type: 'beneficial',
+      description: profile.language === 'hi'
+        ? 'मांसपेशियों और ऊतकों के पुनर्निर्माण के लिए आवश्यक गुणवत्तापूर्ण अमीनो एसिड।'
+        : 'High-quality amino acid profile supporting cellular repair and satiety.',
+    });
+  }
+
+  // 5. Anti-Inflammatory Spices & Herbs
+  if (/(turmeric|curcumin|ginger|cinnamon|black pepper|garlic|cardamom|clove|basil|rosemary)/i.test(ingredientsStr)) {
+    ingredientScoreDelta += 5;
+    beneficialIngredients.push('Anti-Inflammatory Botanicals');
+    ingredientFlags.push({
+      name: profile.language === 'hi' ? 'सूजनरोधी मसाले (हल्दी / अदरक / दालचीनी)' : 'Anti-Inflammatory Spices & Herbs',
+      type: 'beneficial',
+      description: profile.language === 'hi'
+        ? 'शरीर में सूजन कम करने वाले प्राकृतिक औषधीय मसाले।'
+        : 'Natural therapeutic culinary botanicals with proven cellular antioxidant benefits.',
+    });
+  }
+
+  // 6. Probiotics & Live Cultures
+  if (/(live cultures|probiotics|lactobacillus|bifidobacterium|kefir|fermented)/i.test(ingredientsStr)) {
+    ingredientScoreDelta += 7;
+    beneficialIngredients.push('Live Probiotic Cultures');
+    ingredientFlags.push({
+      name: profile.language === 'hi' ? 'सक्रिय प्रोबायोटिक्स / लाइव कल्चर' : 'Live Probiotic Cultures',
+      type: 'beneficial',
+      description: profile.language === 'hi'
+        ? 'पाचन तंत्र और आंतों की प्रतिरक्षा को मजबूत करने वाले जीवित मित्र बैक्टीरिया।'
+        : 'Beneficial microorganisms supporting microbiome balance and digestion.',
+    });
+  }
+
+  // Clean Short Label Bonus vs Heavy Ultra-Processed Matrix
+  if (safeIngredientsList.length > 0 && safeIngredientsList.length <= 5 && harmfulIngredients.length === 0) {
+    ingredientScoreDelta += 8;
+    ingredientFlags.push({
+      name: profile.language === 'hi' ? 'क्लीन शॉर्ट लेबल (अति-कम सामग्री)' : 'Clean Short Label (≤ 5 Ingredients)',
+      type: 'beneficial',
+      description: profile.language === 'hi'
+        ? 'केवल 5 या उससे कम वास्तविक घटक; कोई रासायनिक प्रिजर्वेटिव या मिलावट नहीं।'
+        : 'Uncluttered recipe with minimal ingredients and zero synthetic chemicals.',
+    });
+  } else if (harmfulIngredients.length >= 3 || safeIngredientsList.length >= 16) {
+    ingredientScoreDelta -= 8;
+  }
+
+  // Apply ingredient score adjustment to total score
+  score += ingredientScoreDelta;
+
+  const hasPalmOil = harmfulIngredients.some(h => h.includes('Palm Oil'));
+  const hasRefinedFlour = harmfulIngredients.some(h => h.includes('Refined Flour'));
 
   const keyFlags: string[] = [];
   if (sugarLvl === 'High') keyFlags.push('High Sugar');
   if (sodiumLvl === 'High') keyFlags.push('High Sodium');
   if (fatLvl === 'High') keyFlags.push('High Fat');
-  if (hasPalmOil) keyFlags.push('Contains Palm Oil');
-  if (hasRefinedFlour) keyFlags.push('Refined Flour (Maida)');
-  if (proteinLvl === 'High') keyFlags.push('Protein Source');
-  if (fibreLvl === 'High') keyFlags.push('Good Fibre');
+  
+  // Add specific detected ingredient flags
+  for (const h of harmfulIngredients) {
+    if (!keyFlags.includes(h)) keyFlags.push(h);
+  }
+  for (const b of beneficialIngredients) {
+    if (!keyFlags.includes(b)) keyFlags.push(b);
+  }
+
+  if (proteinLvl === 'High' && !keyFlags.includes('Protein Source')) keyFlags.push('Protein Source');
+  if (fibreLvl === 'High' && !keyFlags.includes('Good Fibre')) keyFlags.push('Good Fibre');
 
   // Allergy Check
   let hasAllergyAlert = false;
@@ -187,34 +396,62 @@ export function evaluateFoodNutrition(
   // Clamp score
   score = Math.max(8, Math.min(96, score));
 
-  // Determine status
+  // Determine status (Clinical cutoffs: >= 65 is Good Choice, < 42 is Avoid)
   let status: HealthStatus = 'Limit';
-  if (score >= 70) {
+  if (score >= 65) {
     status = 'Good Choice';
-  } else if (score < 40) {
+  } else if (score < 42) {
     status = 'Avoid';
   }
 
-  // Simple reason
+  // Simple reason with real ingredient specifics
   let simpleReason = '';
   if (status === 'Avoid') {
-    simpleReason = profile.language === 'hi'
-      ? (sugarLvl === 'High' ? 'अत्यधिक चीनी और प्रोसेस्ड तेल।' : 'अत्यधिक नमक, रिफाइंड तेल और कम पोषण।')
-      : profile.language === 'bn'
-      ? (sugarLvl === 'High' ? 'অতিরিক্ত চিনি ও প্রক্রিয়াজাত তেল।' : 'অতিরিক্ত লবণ, পাম অয়েল ও কম পুষ্টিমান।')
-      : (sugarLvl === 'High' ? 'High sugar and processed ingredients.' : 'High salt and processed oil.');
+    if (harmfulIngredients.length > 0) {
+      const topHarmful = harmfulIngredients.slice(0, 2).join(' & ');
+      simpleReason = profile.language === 'hi'
+        ? `अस्वास्थ्यकर घटक: इसमें ${topHarmful} और अत्यधिक प्रोसेस्ड रसायन शामिल हैं।`
+        : profile.language === 'bn'
+        ? `ক্ষতিকর উপাদান: এতে ${topHarmful} ও অতিরিক্ত প্রক্রিয়াজাত রাসায়নিক রয়েছে।`
+        : `Avoid: High health concern due to ${topHarmful} with ultra-processed additives.`;
+    } else {
+      simpleReason = profile.language === 'hi'
+        ? (sugarLvl === 'High' ? 'अत्यधिक चीनी और प्रोसेस्ड तेल।' : 'अत्यधिक नमक, रिफाइंड तेल और कम पोषण।')
+        : profile.language === 'bn'
+        ? (sugarLvl === 'High' ? 'অতিরিক্ত চিনি ও প্রক্রিয়াজাত তেল।' : 'অতিরিক্ত লবণ, পাম অয়েল ও কম পুষ্টিমান।')
+        : (sugarLvl === 'High' ? 'Avoid: High sugar load and low nutritional density.' : 'Avoid: High sodium, industrial fats and low nutrition.');
+    }
   } else if (status === 'Limit') {
-    simpleReason = profile.language === 'hi'
-      ? 'मध्यम स्तर का नमक और वसा; कभी-कभार के लिए ठीक है।'
-      : profile.language === 'bn'
-      ? 'মাঝারি মাত্রার সোডিয়াম ও ফ্যাট; মাঝে মাঝে খাওয়ার উপযোগী।'
-      : 'Moderate sodium and processed oils; best in moderation.';
+    if (harmfulIngredients.length > 0) {
+      const topHarmful = harmfulIngredients[0];
+      simpleReason = profile.language === 'hi'
+        ? `सीमित सेवन: इसमें ${topHarmful} मौजूद है; कभी-कभार के लिए ही उपयुक्त है।`
+        : profile.language === 'bn'
+        ? `পরিমিত খান: এতে ${topHarmful} রয়েছে; অনিয়মিত খাওয়ার উপযোগী।`
+        : `Limit: Contains ${topHarmful}; best consumed in moderation.`;
+    } else {
+      simpleReason = profile.language === 'hi'
+        ? 'मध्यम स्तर का नमक और वसा; कभी-कभार के लिए ठीक है।'
+        : profile.language === 'bn'
+        ? 'মাঝারি মাত্রার সোডিয়াম ও ফ্যাট; মাঝে মাঝে খাওয়ার উপযোগী।'
+        : 'Limit: Moderate sodium and processed oils; best in moderation.';
+    }
   } else {
-    simpleReason = profile.language === 'hi'
-      ? 'प्राकृतिक पोषक तत्व, अच्छा फाइबर व संतुलित कैलोरी।'
-      : profile.language === 'bn'
-      ? 'প্রাকৃতিক উপাদান, পর্যাপ্ত ফাইবার ও নিয়ন্ত্রিত সোডিয়াম।'
-      : 'Wholesome ingredients, good fibre, and clean nutrients.';
+    // Good Choice
+    if (beneficialIngredients.length > 0) {
+      const topBeneficial = beneficialIngredients.slice(0, 2).join(' & ');
+      simpleReason = profile.language === 'hi'
+        ? `उत्तम विकल्प: ${topBeneficial} से भरपूर, बिना हानिकारक मिलावट के।`
+        : profile.language === 'bn'
+        ? `উত্তম পছন্দ: ${topBeneficial} সমৃদ্ধ ও ক্ষতিকর রাসায়নিকমুক্ত।`
+        : `Good Choice: Wholesome formulation rich in ${topBeneficial} with clean nutrition.`;
+    } else {
+      simpleReason = profile.language === 'hi'
+        ? 'प्राकृतिक पोषक तत्व, अच्छा फाइबर व संतुलित कैलोरी।'
+        : profile.language === 'bn'
+        ? 'প্রাকৃতিক উপাদান, পর্যাপ্ত ফাইবার ও নিয়ন্ত্রিত সোডিয়াম।'
+        : 'Good Choice: Wholesome ingredients, good fibre, and clean nutrients.';
+    }
   }
 
   // Realistic better swaps with real healthier market brands
@@ -238,7 +475,8 @@ export function evaluateFoodNutrition(
       fibre: fibreLvl,
     },
     rawNutrition: nutrition,
-    keyFlags: keyFlags.slice(0, 4),
+    keyFlags: keyFlags.slice(0, 5),
+    ingredientFlags: ingredientFlags.slice(0, 6),
     simpleReason,
     personalNote,
     betterAlternatives,

@@ -217,3 +217,31 @@
   -ms-overflow-style: none;
   scrollbar-width: none;
 }
+
+/* Realistic Heartbeat Pumping Animation */
+@keyframes heartPump {
+  0% {
+    transform: scale(1);
+  }
+  14% {
+    transform: scale(1.32);
+  }
+  28% {
+    transform: scale(1);
+  }
+  42% {
+    transform: scale(1.32);
+  }
+  70% {
+    transform: scale(1);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+.animate-heart-pump {
+  display: inline-block;
+  animation: heartPump 1.25s cubic-bezier(0.215, 0.61, 0.355, 1) infinite;
+  transform-origin: center;
+}

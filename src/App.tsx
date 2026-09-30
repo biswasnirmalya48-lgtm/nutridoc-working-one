@@ -4,7 +4,6 @@
  */
 
 import React, { useState, useEffect } from 'react';
-import { AnimatePresence, motion } from 'motion/react';
 import { Header } from './components/Header';
 import { BottomNav } from './components/BottomNav';
 import { HomeView } from './components/HomeView';
@@ -15,12 +14,16 @@ import { ReportScanner } from './components/ReportSimplifier/ReportScanner';
 import { ReportResultView } from './components/ReportSimplifier/ReportResultView';
 import { HistoryView } from './components/History/HistoryView';
 import { ProfileView } from './components/Profile/ProfileView';
+import { GoogleAuthModal } from './components/Auth/GoogleAuthModal';
+import { LoginPage } from './components/Auth/LoginPage';
+import { auth, onAuthStateChanged, checkRedirectResult, logoutGoogle } from './firebase';
 import {
   FoodAnalysisResult,
   Language,
   NutritionData,
   ReportAnalysisResult,
   ScanHistoryItem,
+  UserAccount,
   UserProfile,
 } from './types';
 import { evaluateFoodNutrition } from './utils/nutritionEngine';
@@ -61,13 +64,105 @@ export default function App() {
     category: string;
     barcode?: string;
     frontImageUrl: string;
+    referenceImages?: string[];
+    isVerifiedDatabase?: boolean;
     nutrition: NutritionData;
   } | null>(null);
 
   const [activeFoodResult, setActiveFoodResult] = useState<FoodAnalysisResult | null>(null);
   const [activeReportResult, setActiveReportResult] = useState<ReportAnalysisResult | null>(null);
 
-  // 4. Scan History (Real user scans only)
+  // 4. Google User Account State
+  const [currentUser, setCurrentUser] = useState<UserAccount | null>(() => {
+    try {
+      const saved = localStorage.getItem('nutridoc_google_user');
+      return saved ? JSON.parse(saved) : null;
+    } catch {
+      return null;
+    }
+  });
+  const [isGuest, setIsGuest] = useState<boolean>(() => {
+    try {
+      return localStorage.getItem('nutridoc_guest_entry') === 'true';
+    } catch {
+      return false;
+    }
+  });
+  const [showGoogleModal, setShowGoogleModal] = useState<boolean>(false);
+
+  // Sync with Firebase Google Auth on boot and handle redirect login
+  useEffect(() => {
+    checkRedirectResult()
+      .then((fbUser) => {
+        if (fbUser) {
+          const user: UserAccount = {
+            id: fbUser.uid,
+            name: fbUser.displayName || fbUser.email?.split('@')[0] || 'User',
+            email: fbUser.email || '',
+            avatar:
+              fbUser.photoURL ||
+              `https://api.dicebear.com/7.x/notionists/svg?seed=${encodeURIComponent(fbUser.email || 'user')}&backgroundColor=e5e7eb`,
+            provider: 'google',
+            signedInAt: Date.now(),
+          };
+          handleLoginSuccess(user);
+        }
+      })
+      .catch((err) => console.warn('Redirect check note:', err));
+
+    const unsubscribe = onAuthStateChanged(auth, (fbUser) => {
+      if (fbUser) {
+        const user: UserAccount = {
+          id: fbUser.uid,
+          name: fbUser.displayName || fbUser.email?.split('@')[0] || 'User',
+          email: fbUser.email || '',
+          avatar:
+            fbUser.photoURL ||
+            `https://api.dicebear.com/7.x/notionists/svg?seed=${encodeURIComponent(fbUser.email || 'user')}&backgroundColor=e5e7eb`,
+          provider: 'google',
+          signedInAt: Date.now(),
+        };
+        handleLoginSuccess(user);
+      }
+    });
+
+    return () => unsubscribe();
+  }, []);
+
+  const handleLoginSuccess = (user: UserAccount) => {
+    setCurrentUser(user);
+    try {
+      localStorage.setItem('nutridoc_google_user', JSON.stringify(user));
+      localStorage.removeItem('nutridoc_guest_entry');
+    } catch (e) {
+      console.warn('Failed to save google user', e);
+    }
+  };
+
+  const handleContinueAsGuest = () => {
+    setIsGuest(true);
+    try {
+      localStorage.setItem('nutridoc_guest_entry', 'true');
+    } catch (e) {}
+  };
+
+  const handleLogout = async () => {
+    try {
+      await logoutGoogle();
+    } catch (e) {
+      console.warn('Firebase signout note', e);
+    }
+    setCurrentUser(null);
+    setIsGuest(false);
+    try {
+      localStorage.removeItem('nutridoc_google_user');
+      localStorage.removeItem('nutridoc_guest_entry');
+    } catch (e) {
+      console.warn('Failed to remove google user', e);
+    }
+  };
+
+  // 5. Scan History (Real user scans only)
   const [scanHistory, setScanHistory] = useState<ScanHistoryItem[]>(() => {
     try {
       const saved = localStorage.getItem('nutridoc_history');
@@ -118,6 +213,8 @@ export default function App() {
     category: string;
     barcode?: string;
     frontImageUrl: string;
+    referenceImages?: string[];
+    isVerifiedDatabase?: boolean;
     nutrition: NutritionData;
   }) => {
     setStagedFoodData(data);
@@ -146,6 +243,12 @@ export default function App() {
 
       if (res.ok) {
         const result: FoodAnalysisResult = await res.json();
+        if (confirmedData.referenceImages && confirmedData.referenceImages.length > 0) {
+          result.referenceImages = confirmedData.referenceImages;
+        }
+        if (confirmedData.isVerifiedDatabase) {
+          result.isVerifiedDatabase = true;
+        }
         setActiveFoodResult(result);
         handleSaveToHistory({ type: 'food', data: result });
         setActiveView('food_result');
@@ -159,6 +262,12 @@ export default function App() {
           confirmedData.frontImageUrl,
           confirmedData.barcode
         );
+        if (confirmedData.referenceImages && confirmedData.referenceImages.length > 0) {
+          evalResult.referenceImages = confirmedData.referenceImages;
+        }
+        if (confirmedData.isVerifiedDatabase) {
+          evalResult.isVerifiedDatabase = true;
+        }
         setActiveFoodResult(evalResult);
         handleSaveToHistory({ type: 'food', data: evalResult });
         setActiveView('food_result');
@@ -174,6 +283,12 @@ export default function App() {
         confirmedData.frontImageUrl,
         confirmedData.barcode
       );
+      if (confirmedData.referenceImages && confirmedData.referenceImages.length > 0) {
+        evalResult.referenceImages = confirmedData.referenceImages;
+      }
+      if (confirmedData.isVerifiedDatabase) {
+        evalResult.isVerifiedDatabase = true;
+      }
       setActiveFoodResult(evalResult);
       handleSaveToHistory({ type: 'food', data: evalResult });
       setActiveView('food_result');
@@ -187,162 +302,139 @@ export default function App() {
     setActiveView('report_result');
   };
 
+  // If not logged in and not guest, render the dedicated Apple-style Google Login Page
+  if (!currentUser && !isGuest) {
+    return (
+      <LoginPage
+        onLoginSuccess={handleLoginSuccess}
+        onContinueAsGuest={handleContinueAsGuest}
+      />
+    );
+  }
+
   return (
     <div className="min-h-screen bg-[#F7F7F5] text-[#161616] flex flex-col font-sans antialiased selection:bg-neutral-200">
       {/* Top Apple Minimal Header */}
       <Header
         profile={profile}
+        currentUser={currentUser}
         onUpdateLanguage={handleUpdateLanguage}
         onOpenProfile={() => {
           setActiveTab('profile');
           setActiveView('main');
         }}
+        onOpenGoogleAuth={() => setShowGoogleModal(true)}
       />
 
       {/* Main Responsive Viewport Area */}
       <main className="flex-1 w-full max-w-md mx-auto px-4 pt-3 pb-24 relative">
-        <AnimatePresence mode="wait">
-          {/* VIEW 1: Live Food Camera Scanner */}
-          {activeView === 'food_camera' && (
-            <motion.div
-              key="food_camera"
-              initial={{ opacity: 0, y: 8 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.985 }}
-              transition={{ duration: 0.22, ease: [0.16, 1, 0.3, 1] }}
-            >
-              <CameraScanner
-                onCaptureComplete={handleFoodCaptureComplete}
-                onCancel={() => setActiveView('main')}
+        {/* VIEW 1: Live Food Camera Scanner */}
+        {activeView === 'food_camera' && (
+          <div key="food_camera" className="animate-fade-in">
+            <CameraScanner
+              onCaptureComplete={handleFoodCaptureComplete}
+              onCancel={() => setActiveView('main')}
+              profile={profile}
+            />
+          </div>
+        )}
+
+        {/* VIEW 2: Nutrition Confirmation & Edit Screen */}
+        {activeView === 'food_confirm' && stagedFoodData && (
+          <div key="food_confirm" className="animate-fade-in">
+            <NutritionEditModal
+              initialData={stagedFoodData}
+              onConfirm={handleFoodConfirmed}
+              onCancel={() => setActiveView('main')}
+              profile={profile}
+            />
+          </div>
+        )}
+
+        {/* VIEW 3: Food Result Screen */}
+        {activeView === 'food_result' && activeFoodResult && (
+          <div key="food_result" className="animate-fade-in">
+            <FoodResultView
+              result={activeFoodResult}
+              onBack={() => setActiveView('main')}
+              onScanAnother={() => setActiveView('food_camera')}
+              profile={profile}
+            />
+          </div>
+        )}
+
+        {/* VIEW 4: Prescription & Report Scanner */}
+        {activeView === 'report_scanner' && (
+          <div key="report_scanner" className="animate-fade-in">
+            <ReportScanner
+              onAnalyzeComplete={handleReportAnalysisComplete}
+              onCancel={() => setActiveView('main')}
+              profile={profile}
+            />
+          </div>
+        )}
+
+        {/* VIEW 5: Report Result Screen */}
+        {activeView === 'report_result' && activeReportResult && (
+          <div key="report_result" className="animate-fade-in">
+            <ReportResultView
+              result={activeReportResult}
+              onBack={() => setActiveView('main')}
+              onScanAnother={() => setActiveView('report_scanner')}
+              profile={profile}
+            />
+          </div>
+        )}
+
+        {/* VIEW 6: Home Screen or Bottom Tabs */}
+        {activeView === 'main' && (
+          <div key={`main_${activeTab}`} className="animate-fade-in">
+            {activeTab === 'home' && (
+              <HomeView
+                onStartFoodScan={() => setActiveView('food_camera')}
+                onStartReportScan={() => setActiveView('report_scanner')}
+                profile={profile}
+                history={scanHistory}
+                onSelectFood={(f) => {
+                  setActiveFoodResult(f);
+                  setActiveView('food_result');
+                }}
+                onSelectReport={(r) => {
+                  setActiveReportResult(r);
+                  setActiveView('report_result');
+                }}
+              />
+            )}
+
+            {activeTab === 'history' && (
+              <HistoryView
+                history={scanHistory}
+                onSelectFood={(f) => {
+                  setActiveFoodResult(f);
+                  setActiveView('food_result');
+                }}
+                onSelectReport={(r) => {
+                  setActiveReportResult(r);
+                  setActiveView('report_result');
+                }}
+                onClearHistory={handleClearHistory}
+                onStartFoodScan={() => setActiveView('food_camera')}
+                onStartReportScan={() => setActiveView('report_scanner')}
                 profile={profile}
               />
-            </motion.div>
-          )}
+            )}
 
-          {/* VIEW 2: Nutrition Confirmation & Edit Screen */}
-          {activeView === 'food_confirm' && stagedFoodData && (
-            <motion.div
-              key="food_confirm"
-              initial={{ opacity: 0, y: 16 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: 12 }}
-              transition={{ duration: 0.24, ease: [0.16, 1, 0.3, 1] }}
-            >
-              <NutritionEditModal
-                initialData={stagedFoodData}
-                onConfirm={handleFoodConfirmed}
-                onCancel={() => setActiveView('main')}
+            {activeTab === 'profile' && (
+              <ProfileView
                 profile={profile}
+                currentUser={currentUser}
+                onUpdateProfile={(updated) => setProfile(updated)}
+                onOpenGoogleAuth={() => setShowGoogleModal(true)}
+                onLogout={handleLogout}
               />
-            </motion.div>
-          )}
-
-          {/* VIEW 3: Food Result Screen */}
-          {activeView === 'food_result' && activeFoodResult && (
-            <motion.div
-              key="food_result"
-              initial={{ opacity: 0, y: 8 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.985 }}
-              transition={{ duration: 0.22, ease: [0.16, 1, 0.3, 1] }}
-            >
-              <FoodResultView
-                result={activeFoodResult}
-                onBack={() => setActiveView('main')}
-                onScanAnother={() => setActiveView('food_camera')}
-                profile={profile}
-              />
-            </motion.div>
-          )}
-
-          {/* VIEW 4: Prescription & Report Scanner */}
-          {activeView === 'report_scanner' && (
-            <motion.div
-              key="report_scanner"
-              initial={{ opacity: 0, y: 8 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.985 }}
-              transition={{ duration: 0.22, ease: [0.16, 1, 0.3, 1] }}
-            >
-              <ReportScanner
-                onAnalyzeComplete={handleReportAnalysisComplete}
-                onCancel={() => setActiveView('main')}
-                profile={profile}
-              />
-            </motion.div>
-          )}
-
-          {/* VIEW 5: Report Result Screen */}
-          {activeView === 'report_result' && activeReportResult && (
-            <motion.div
-              key="report_result"
-              initial={{ opacity: 0, y: 8 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.985 }}
-              transition={{ duration: 0.22, ease: [0.16, 1, 0.3, 1] }}
-            >
-              <ReportResultView
-                result={activeReportResult}
-                onBack={() => setActiveView('main')}
-                onScanAnother={() => setActiveView('report_scanner')}
-                profile={profile}
-              />
-            </motion.div>
-          )}
-
-          {/* VIEW 6: Home Screen or Bottom Tabs */}
-          {activeView === 'main' && (
-            <motion.div
-              key={`main_${activeTab}`}
-              initial={{ opacity: 0, y: 8 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.985 }}
-              transition={{ duration: 0.2, ease: [0.16, 1, 0.3, 1] }}
-            >
-              {activeTab === 'home' && (
-                <HomeView
-                  onStartFoodScan={() => setActiveView('food_camera')}
-                  onStartReportScan={() => setActiveView('report_scanner')}
-                  profile={profile}
-                  history={scanHistory}
-                  onSelectFood={(f) => {
-                    setActiveFoodResult(f);
-                    setActiveView('food_result');
-                  }}
-                  onSelectReport={(r) => {
-                    setActiveReportResult(r);
-                    setActiveView('report_result');
-                  }}
-                />
-              )}
-
-              {activeTab === 'history' && (
-                <HistoryView
-                  history={scanHistory}
-                  onSelectFood={(f) => {
-                    setActiveFoodResult(f);
-                    setActiveView('food_result');
-                  }}
-                  onSelectReport={(r) => {
-                    setActiveReportResult(r);
-                    setActiveView('report_result');
-                  }}
-                  onClearHistory={handleClearHistory}
-                  onStartFoodScan={() => setActiveView('food_camera')}
-                  onStartReportScan={() => setActiveView('report_scanner')}
-                  profile={profile}
-                />
-              )}
-
-              {activeTab === 'profile' && (
-                <ProfileView
-                  profile={profile}
-                  onUpdateProfile={(updated) => setProfile(updated)}
-                />
-              )}
-            </motion.div>
-          )}
-        </AnimatePresence>
+            )}
+          </div>
+        )}
       </main>
 
       {/* Floating Bottom Navigation */}
@@ -356,6 +448,15 @@ export default function App() {
           language={profile.language}
         />
       )}
+
+      {/* Google Authentication Modal */}
+      <GoogleAuthModal
+        currentUser={currentUser}
+        isOpen={showGoogleModal}
+        onClose={() => setShowGoogleModal(false)}
+        onLoginSuccess={handleLoginSuccess}
+        onLogout={handleLogout}
+      />
     </div>
   );
 }

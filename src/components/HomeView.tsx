@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
-import { motion } from 'motion/react';
 import { Camera, FileText, ArrowRight } from 'lucide-react';
 import { FoodAnalysisResult, ReportAnalysisResult, ScanHistoryItem, UserProfile } from '../types';
+import { MadeByFooter } from './Common/MadeByFooter';
 
 interface HomeViewProps {
   onStartFoodScan: () => void;
@@ -43,62 +43,55 @@ export const HomeView: React.FC<HomeViewProps> = ({
 
   return (
     <div className="space-y-5 pb-20 pt-1">
-      {/* Calm Header Greeting */}
-      <div className="space-y-1 px-1">
-        <h2 className="text-xl font-semibold tracking-tight text-[#161616]">
-          {greeting}
-        </h2>
-        <p className="text-sm text-[#737373]">
-          {isHindi
-            ? 'आज आप क्या जांचना चाहते हैं?'
-            : isBengali
-            ? 'আজ কি পরীক্ষা করতে চান?'
-            : 'What would you like to check today?'}
-        </p>
+      {/* Calm Header Greeting & Minimal UNSCRIPTED Team Logo */}
+      <div className="flex items-center justify-between px-1 gap-2">
+        <div className="space-y-0.5 min-w-0">
+          <h2 className="text-xl font-semibold tracking-tight text-[#161616]">
+            {greeting}
+          </h2>
+          <p className="text-sm text-[#737373] truncate">
+            {isHindi
+              ? 'आज आप क्या जांचना चाहते हैं?'
+              : isBengali
+              ? 'আজ কি পরীক্ষা করতে চান?'
+              : 'What would you like to check today?'}
+          </p>
+        </div>
+
+        {/* Minimal Visible Team Logo of 'UNSCRIPTED' */}
+        <div
+          className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-white border border-black/[0.08] shadow-[0_1px_4px_rgba(0,0,0,0.03)] backdrop-blur-xs select-none hover:border-black/[0.16] transition-all cursor-default shrink-0 group"
+          title="Team UNSCRIPTED"
+        >
+          <div className="w-4 h-4 rounded-[5px] bg-[#161616] text-white flex items-center justify-center text-[9px] font-black tracking-tighter group-hover:scale-105 transition-transform">
+            U
+          </div>
+          <span className="text-[10px] font-bold tracking-[0.18em] uppercase text-[#161616]">
+            UNSCRIPTED
+          </span>
+        </div>
       </div>
 
       {/* Liquid Mode Pill Switcher (Water-drop flow under glass) */}
       <div className="relative p-1 liquid-glass-capsule rounded-full flex items-center">
         <button
           onClick={() => handleModeSwitch('food')}
-          className="relative flex-1 flex items-center justify-center gap-2 py-2 text-xs font-semibold rounded-full transition-colors z-10 liquid-ripple"
+          className={`relative flex-1 flex items-center justify-center gap-2 py-2 text-xs font-semibold rounded-full transition-all duration-200 z-10 liquid-ripple ${
+            activeScanMode === 'food' ? 'bg-[#161616] text-white shadow-xs' : 'text-[#737373] hover:text-[#161616]'
+          }`}
         >
-          {activeScanMode === 'food' && (
-            <motion.div
-              layoutId="activeScanModeIndicator"
-              className="absolute inset-0 rounded-full liquid-glass-active-pill"
-              transition={{ type: 'spring', stiffness: 450, damping: 32 }}
-            />
-          )}
-          <span
-            className={`relative z-10 flex items-center gap-1.5 transition-colors duration-150 ${
-              activeScanMode === 'food' ? 'text-white' : 'text-[#737373] hover:text-[#161616]'
-            }`}
-          >
-            <Camera className="w-3.5 h-3.5" />
-            <span>{isHindi ? 'खाद्य स्कैन' : isBengali ? 'খাদ্য স্ক্যান' : 'Food Scan'}</span>
-          </span>
+          <Camera className="w-3.5 h-3.5" />
+          <span>{isHindi ? 'खाद्य स्कैन' : isBengali ? 'খাদ্য স্ক্যান' : 'Food Scan'}</span>
         </button>
 
         <button
           onClick={() => handleModeSwitch('report')}
-          className="relative flex-1 flex items-center justify-center gap-2 py-2 text-xs font-semibold rounded-full transition-colors z-10 liquid-ripple"
+          className={`relative flex-1 flex items-center justify-center gap-2 py-2 text-xs font-semibold rounded-full transition-all duration-200 z-10 liquid-ripple ${
+            activeScanMode === 'report' ? 'bg-[#161616] text-white shadow-xs' : 'text-[#737373] hover:text-[#161616]'
+          }`}
         >
-          {activeScanMode === 'report' && (
-            <motion.div
-              layoutId="activeScanModeIndicator"
-              className="absolute inset-0 rounded-full liquid-glass-active-pill"
-              transition={{ type: 'spring', stiffness: 450, damping: 32 }}
-            />
-          )}
-          <span
-            className={`relative z-10 flex items-center gap-1.5 transition-colors duration-150 ${
-              activeScanMode === 'report' ? 'text-white' : 'text-[#737373] hover:text-[#161616]'
-            }`}
-          >
-            <FileText className="w-3.5 h-3.5" />
-            <span>{isHindi ? 'रिपोर्ट / पर्चा' : isBengali ? 'রিপোর্ট স্ক্যান' : 'Report Scan'}</span>
-          </span>
+          <FileText className="w-3.5 h-3.5" />
+          <span>{isHindi ? 'रिपोर्ट / पर्चा' : isBengali ? 'রিপোর্ট স্ক্যান' : 'Report Scan'}</span>
         </button>
       </div>
 
@@ -258,6 +251,21 @@ export const HomeView: React.FC<HomeViewProps> = ({
           </div>
         </div>
       )}
+
+      {/* Visibly Minimal Team UNSCRIPTED Badge */}
+      <div className="pt-3 pb-1 flex justify-center items-center">
+        <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/70 border border-black/[0.05] shadow-[0_1px_3px_rgba(0,0,0,0.02)] select-none">
+          <div className="w-3.5 h-3.5 rounded bg-[#161616] text-white flex items-center justify-center text-[8px] font-black">
+            U
+          </div>
+          <span className="text-[10px] font-medium text-[#737373]">
+            Powered by Team <strong className="font-semibold text-[#161616] tracking-wider">UNSCRIPTED</strong>
+          </span>
+        </div>
+      </div>
+
+      {/* Made With ❤️ by Nirmalya ! with animated pumping heart */}
+      <MadeByFooter className="pt-1 pb-4" />
     </div>
   );
 };

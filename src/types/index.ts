@@ -47,6 +47,8 @@ export interface FoodAnalysisResult {
   category: string;
   barcode?: string;
   imageUrl: string;
+  referenceImages?: string[]; // Real images found online / Google / OpenFoodFacts
+  isVerifiedDatabase?: boolean; // Verified from official OpenFoodFacts database
   healthScore: number; // 0 - 100
   status: HealthStatus;
   nutrition: {
@@ -58,10 +60,24 @@ export interface FoodAnalysisResult {
   };
   rawNutrition?: NutritionData;
   keyFlags: string[];
+  ingredientFlags?: {
+    name: string;
+    type: 'harmful' | 'beneficial' | 'neutral';
+    description: string;
+  }[];
   simpleReason: string;
   personalNote: string;
   betterAlternatives: BetterAlternative[];
   disclaimer: string;
+}
+
+export interface UserAccount {
+  id: string;
+  name: string;
+  email: string;
+  avatar?: string;
+  provider: 'google';
+  signedInAt: number;
 }
 
 export type ReportItemStatus = 'Normal' | 'High' | 'Low' | 'Needs Review';
@@ -74,12 +90,29 @@ export interface ReportItem {
   simpleMeaning: string;
 }
 
+export interface MedicineSchedule {
+  morning?: boolean;
+  afternoon?: boolean;
+  night?: boolean;
+  mealRelation?: string;
+}
+
 export interface MedicineNote {
   medicineName: string;
+  dosage?: string;
+  purpose?: string;
+  timing?: string;
+  schedule?: MedicineSchedule;
+  duration?: string;
   writtenInstruction: string;
   confidence: 'High' | 'Medium' | 'Low';
   warning?: string;
   unclearParts?: string[];
+}
+
+export interface PatientConditionInfo {
+  whatHappened: string;
+  simplePoints: string[];
 }
 
 export interface ReportAnalysisResult {
@@ -87,9 +120,11 @@ export interface ReportAnalysisResult {
   timestamp: number;
   documentType: 'Lab Report' | 'Prescription' | 'Other';
   summary: string;
+  patientCondition?: PatientConditionInfo;
   imageUrl?: string;
   items: ReportItem[];
   medicineNotes: MedicineNote[];
+  doctorAdvice?: string[];
   nextStep: string;
   disclaimer: string;
 }

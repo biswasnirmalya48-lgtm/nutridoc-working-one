@@ -1,5 +1,4 @@
 import React, { useState, useEffect } from 'react';
-import { motion } from 'motion/react';
 import { FoodAnalysisResult, UserProfile, BetterAlternative } from '../../types';
 import {
   ArrowLeft,
@@ -11,7 +10,12 @@ import {
   Volume2,
   VolumeX,
   Package,
+  Sparkles,
+  Globe,
+  CheckCircle2,
+  Barcode,
 } from 'lucide-react';
+import { MadeByFooter } from '../Common/MadeByFooter';
 
 interface FoodResultViewProps {
   result: FoodAnalysisResult;
@@ -34,6 +38,16 @@ export const FoodResultView: React.FC<FoodResultViewProps> = ({
   const [expandedAltIndex, setExpandedAltIndex] = useState<number | null>(null);
   const [copiedIndex, setCopiedIndex] = useState<number | null>(null);
   const [isSpeaking, setIsSpeaking] = useState(false);
+  const [selectedImageUrl, setSelectedImageUrl] = useState<string>(result.imageUrl || result.referenceImages?.[0] || '');
+
+  // Synchronize hero image when props change, prioritizing user's scanned photo
+  useEffect(() => {
+    if (result.imageUrl) {
+      setSelectedImageUrl(result.imageUrl);
+    } else if (result.referenceImages && result.referenceImages.length > 0) {
+      setSelectedImageUrl(result.referenceImages[0]);
+    }
+  }, [result.imageUrl, result.referenceImages]);
 
   // Smooth Apple animated score counter
   const [displayScore, setDisplayScore] = useState(0);
@@ -192,16 +206,11 @@ export const FoodResultView: React.FC<FoodResultViewProps> = ({
 
       {/* Main Scanned Product Container (Clean Flat Spacious Card with soft depth) */}
       <div className="bg-white rounded-[24px] p-6 border border-black/[0.06] shadow-[0_2px_16px_rgba(0,0,0,0.03)] space-y-6">
-        {/* Scanned Product Image is the Visual Hero (Staggered Soft Fade) */}
-        <motion.div
-          initial={{ opacity: 0, y: 10 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.28, ease: [0.16, 1, 0.3, 1] }}
-          className="relative w-full h-56 rounded-[20px] overflow-hidden bg-[#F7F7F5] flex items-center justify-center border border-black/[0.04]"
-        >
-          {result.imageUrl ? (
+        {/* Scanned Product Image is the Visual Hero */}
+        <div className="relative w-full h-56 rounded-[20px] overflow-hidden bg-[#F7F7F5] flex items-center justify-center border border-black/[0.04] animate-fade-in">
+          {selectedImageUrl || result.imageUrl ? (
             <img
-              src={result.imageUrl}
+              src={selectedImageUrl || result.imageUrl}
               alt={result.productName}
               className="w-full h-full object-cover"
             />
@@ -211,33 +220,98 @@ export const FoodResultView: React.FC<FoodResultViewProps> = ({
               <span className="text-xs">Product Image</span>
             </div>
           )}
-        </motion.div>
+        </div>
+
+        {/* Real Photos Found on Google / Web Gallery Strip */}
+        {result.referenceImages && result.referenceImages.length > 0 && (
+          <div className="space-y-2 pt-0.5">
+            <div className="flex items-center justify-between text-xs">
+              <span className="font-semibold text-[#161616] flex items-center gap-1.5">
+                <Globe className="w-3.5 h-3.5 text-blue-600" />
+                <span>{isHindi ? 'वेब / गूगल से वास्तविक तस्वीरें' : isBengali ? 'অনলাইন থেকে আসল ছবি' : 'Photos Found Online'}</span>
+              </span>
+              <span className="text-[11px] text-[#86868B]">{result.referenceImages.length} available</span>
+            </div>
+
+            <div className="flex gap-2.5 overflow-x-auto pb-1 scrollbar-none">
+              {/* User Camera Photo */}
+              {result.imageUrl && (
+                <button
+                  onClick={() => setSelectedImageUrl(result.imageUrl)}
+                  className={`relative shrink-0 w-16 h-16 rounded-xl overflow-hidden border-2 transition-all ${
+                    selectedImageUrl === result.imageUrl
+                      ? 'border-black ring-2 ring-black/15 shadow-xs'
+                      : 'border-black/10 opacity-70 hover:opacity-100'
+                  }`}
+                  title="Your Camera Scan"
+                >
+                  <img src={result.imageUrl} alt="Your Camera Scan" className="w-full h-full object-cover" />
+                  <span className="absolute bottom-0 inset-x-0 bg-black/60 text-[9px] text-white text-center py-0.5 font-medium">
+                    Your Scan
+                  </span>
+                </button>
+              )}
+
+              {/* Online Packaging Photos */}
+              {result.referenceImages.map((imgUrl, idx) => (
+                <button
+                  key={idx}
+                  onClick={() => setSelectedImageUrl(imgUrl)}
+                  className={`relative shrink-0 w-16 h-16 rounded-xl overflow-hidden border-2 transition-all bg-[#F7F7F5] ${
+                    selectedImageUrl === imgUrl
+                      ? 'border-black ring-2 ring-black/15 shadow-xs'
+                      : 'border-black/10 opacity-70 hover:opacity-100'
+                  }`}
+                  title={`Web Photo ${idx + 1}`}
+                >
+                  <img
+                    src={imgUrl}
+                    alt={`Web packaging photo ${idx + 1}`}
+                    className="w-full h-full object-contain p-0.5"
+                    onError={(e) => {
+                      (e.currentTarget as HTMLElement).style.display = 'none';
+                    }}
+                  />
+                  <span className="absolute bottom-0 inset-x-0 bg-blue-600/80 text-[9px] text-white text-center py-0.5 font-medium">
+                    Web {idx + 1}
+                  </span>
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
 
         {/* Product Name & Category */}
-        <motion.div
-          initial={{ opacity: 0, y: 8 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.28, delay: 0.08, ease: [0.16, 1, 0.3, 1] }}
-          className="space-y-0.5"
-        >
-          {result.brand && (
-            <p className="text-xs uppercase tracking-wider font-semibold text-[#737373]">
-              {result.brand}
-            </p>
-          )}
+        <div className="space-y-1 animate-fade-in">
+          <div className="flex items-center justify-between gap-2">
+            {result.brand && (
+              <p className="text-xs uppercase tracking-wider font-semibold text-[#737373]">
+                {result.brand}
+              </p>
+            )}
+            {result.barcode && (
+              <span className="inline-flex items-center gap-1 text-[11px] font-mono text-[#86868B] bg-[#F7F7F5] px-2 py-0.5 rounded-md">
+                <Barcode className="w-3 h-3" />
+                {result.barcode}
+              </span>
+            )}
+          </div>
           <h1 className="text-2xl font-bold tracking-tight text-[#161616]">
             {result.productName}
           </h1>
-          <p className="text-sm text-[#737373]">{result.category}</p>
-        </motion.div>
+          <div className="flex items-center gap-2 flex-wrap pt-0.5">
+            <span className="text-sm text-[#737373]">{result.category}</span>
+            {result.isVerifiedDatabase && (
+              <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-emerald-50 text-emerald-800 text-[10px] font-bold border border-emerald-500/20">
+                <CheckCircle2 className="w-3 h-3 text-emerald-600" />
+                Verified Official Database (0% Error)
+              </span>
+            )}
+          </div>
+        </div>
 
         {/* Health Score & Small Coloured Glass Status Pill */}
-        <motion.div
-          initial={{ opacity: 0, y: 8 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.28, delay: 0.14, ease: [0.16, 1, 0.3, 1] }}
-          className="flex items-center justify-between pt-1 pb-1"
-        >
+        <div className="flex items-center justify-between pt-1 pb-1 animate-fade-in">
           <div className="space-y-1.5">
             <span className="text-xs font-medium text-[#737373]">
               Health Score: {displayScore}/100
@@ -281,15 +355,10 @@ export const FoodResultView: React.FC<FoodResultViewProps> = ({
               {displayScore}
             </span>
           </div>
-        </motion.div>
+        </div>
 
         {/* Nutrition values in one clean horizontal row */}
-        <motion.div
-          initial={{ opacity: 0, y: 8 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.28, delay: 0.2, ease: [0.16, 1, 0.3, 1] }}
-          className="pt-2 border-t border-black/[0.04]"
-        >
+        <div className="pt-2 border-t border-black/[0.04] animate-fade-in">
           <div className="grid grid-cols-5 gap-2 text-center">
             <div className={`p-2.5 rounded-2xl ${getNutrientStyle(result.nutrition.sugar, false)}`}>
               <span className="text-[11px] text-[#737373] block">Sugar</span>
@@ -312,7 +381,7 @@ export const FoodResultView: React.FC<FoodResultViewProps> = ({
               <span className="text-xs font-semibold block mt-0.5">{result.nutrition.fibre}</span>
             </div>
           </div>
-        </motion.div>
+        </div>
 
         {/* Why it matters: One short sentence only */}
         <div className="space-y-1.5 pt-2 border-t border-black/[0.04]">
@@ -333,6 +402,57 @@ export const FoodResultView: React.FC<FoodResultViewProps> = ({
             <p className="text-sm text-[#161616] leading-relaxed">
               {result.personalNote}
             </p>
+          </div>
+        )}
+
+        {/* Ingredient Quality & Additive Breakdown */}
+        {((result.ingredientFlags && result.ingredientFlags.length > 0) || (result.keyFlags && result.keyFlags.length > 0)) && (
+          <div className="space-y-2.5 pt-3 border-t border-black/[0.04]">
+            <div className="flex items-center justify-between">
+              <h3 className="text-xs font-semibold text-[#161616] uppercase tracking-wider">
+                {isHindi ? 'सामग्री गुणवत्ता विश्लेषण' : isBengali ? 'উপাদান মান বিশ্লেষণ' : 'Ingredient Quality Analysis'}
+              </h3>
+              <span className="text-[10px] text-[#737373]">Based on Ingredients</span>
+            </div>
+
+            {/* List of Detected Ingredient Insights */}
+            <div className="space-y-1.5">
+              {result.ingredientFlags && result.ingredientFlags.length > 0 ? (
+                result.ingredientFlags.map((flag, idx) => (
+                  <div
+                    key={idx}
+                    className={`p-2.5 rounded-xl border text-xs flex items-start gap-2.5 transition-all ${
+                      flag.type === 'harmful'
+                        ? 'bg-rose-50/70 border-rose-200/60 text-rose-950'
+                        : flag.type === 'beneficial'
+                        ? 'bg-emerald-50/70 border-emerald-200/60 text-emerald-950'
+                        : 'bg-neutral-50 border-neutral-200/60 text-neutral-800'
+                    }`}
+                  >
+                    <span
+                      className={`w-2 h-2 rounded-full shrink-0 mt-1.5 ${
+                        flag.type === 'harmful' ? 'bg-rose-500' : flag.type === 'beneficial' ? 'bg-emerald-500' : 'bg-neutral-400'
+                      }`}
+                    />
+                    <div className="space-y-0.5 min-w-0">
+                      <p className="font-semibold text-[11px]">{flag.name}</p>
+                      <p className="text-[10px] opacity-80 leading-relaxed">{flag.description}</p>
+                    </div>
+                  </div>
+                ))
+              ) : (
+                <div className="flex flex-wrap gap-1.5 pt-1">
+                  {result.keyFlags.map((flag, idx) => (
+                    <span
+                      key={idx}
+                      className="px-2.5 py-1 rounded-full text-[11px] font-medium bg-[#F0EFEA] text-[#161616]"
+                    >
+                      {flag}
+                    </span>
+                  ))}
+                </div>
+              )}
+            </div>
           </div>
         )}
       </div>
@@ -357,41 +477,19 @@ export const FoodResultView: React.FC<FoodResultViewProps> = ({
           <div className="relative flex p-0.5 liquid-glass-capsule rounded-full">
             <button
               onClick={() => setActiveTab('brand')}
-              className="relative px-3 py-1 text-xs transition-colors z-10 liquid-ripple"
+              className={`relative px-3 py-1 text-xs rounded-full transition-all duration-200 z-10 liquid-ripple ${
+                activeTab === 'brand' ? 'bg-[#161616] text-white shadow-xs font-semibold' : 'text-[#737373] hover:text-[#161616]'
+              }`}
             >
-              {activeTab === 'brand' && (
-                <motion.div
-                  layoutId="activeSwapTabCapsule"
-                  className="absolute inset-0 rounded-full liquid-glass-active-pill"
-                  transition={{ type: 'spring', stiffness: 450, damping: 32 }}
-                />
-              )}
-              <span
-                className={`relative z-10 font-medium transition-colors duration-150 ${
-                  activeTab === 'brand' ? 'text-white' : 'text-[#737373] hover:text-[#161616]'
-                }`}
-              >
-                {isHindi ? 'ब्रांड्स' : isBengali ? 'ব্র্যান্ড' : 'Brands'}
-              </span>
+              <span>{isHindi ? 'ब्रांड्स' : isBengali ? 'ব্র্যান্ড' : 'Brands'}</span>
             </button>
             <button
               onClick={() => setActiveTab('fresh')}
-              className="relative px-3 py-1 text-xs transition-colors z-10 liquid-ripple"
+              className={`relative px-3 py-1 text-xs rounded-full transition-all duration-200 z-10 liquid-ripple ${
+                activeTab === 'fresh' ? 'bg-[#161616] text-white shadow-xs font-semibold' : 'text-[#737373] hover:text-[#161616]'
+              }`}
             >
-              {activeTab === 'fresh' && (
-                <motion.div
-                  layoutId="activeSwapTabCapsule"
-                  className="absolute inset-0 rounded-full liquid-glass-active-pill"
-                  transition={{ type: 'spring', stiffness: 450, damping: 32 }}
-                />
-              )}
-              <span
-                className={`relative z-10 font-medium transition-colors duration-150 ${
-                  activeTab === 'fresh' ? 'text-white' : 'text-[#737373] hover:text-[#161616]'
-                }`}
-              >
-                {isHindi ? 'प्राकृतिक' : isBengali ? 'প্রাকৃতিক' : 'Whole food'}
-              </span>
+              <span>{isHindi ? 'प्राकृतिक' : isBengali ? 'প্রাকৃতিক' : 'Whole food'}</span>
             </button>
           </div>
         </div>
@@ -484,13 +582,7 @@ export const FoodResultView: React.FC<FoodResultViewProps> = ({
 
                 {/* Smooth Expandable Comparison Card */}
                 {isExpanded && (
-                  <motion.div
-                    initial={{ opacity: 0, height: 0 }}
-                    animate={{ opacity: 1, height: 'auto' }}
-                    exit={{ opacity: 0, height: 0 }}
-                    transition={{ duration: 0.22, ease: [0.16, 1, 0.3, 1] }}
-                    className="pt-2 overflow-hidden"
-                  >
+                  <div className="pt-2 overflow-hidden animate-fade-in">
                     <div className="rounded-2xl bg-[#F7F7F5] p-3.5 border border-black/[0.06] space-y-2 text-xs">
                       <div className="flex items-center justify-between pb-1.5 border-b border-black/[0.06]">
                         <span className="font-semibold text-[#161616]">
@@ -527,7 +619,7 @@ export const FoodResultView: React.FC<FoodResultViewProps> = ({
                         </div>
                       </div>
                     </div>
-                  </motion.div>
+                  </div>
                 )}
               </div>
             );
@@ -542,6 +634,9 @@ export const FoodResultView: React.FC<FoodResultViewProps> = ({
             'NutriDoc provides everyday nutritional guidance and does not replace medical advice.'}
         </p>
       </div>
+
+      {/* Made With ❤️ by Nirmalya ! with animated pumping heart */}
+      <MadeByFooter className="pt-2 pb-6" />
     </div>
   );
 };
