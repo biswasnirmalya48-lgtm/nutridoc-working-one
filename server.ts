@@ -815,32 +815,41 @@ app.post('/api/recognize-product', async (req: Request, res: Response) => {
         else if (imageBase64.includes('data:image/webp')) mimeType = 'image/webp';
         
         const cleanBase64 = imageBase64.includes(',') ? imageBase64.split(',')[1] : imageBase64;
-        const prompt = `You are NutriDoc's strict food security and packet validation classifier.
-Analyze this photo from the user's camera.
+        const prompt = `You are NutriDoc's intelligent food and nutrition label classifier.
+Analyze this photo from the user's camera or uploaded scan.
 
-CRITICAL DISQUALIFICATION RULES (MUST BE STRICT):
-1. Is this a human person, man, woman, child, selfie, face, body part, clothing, or skin?
-   -> DISQUALIFY IMMEDIATELY!
-   Return: { "isFood": false, "disqualificationType": "person", "reason": "Person or human face detected. NutriDoc only scans packaged food and grocery products. Please frame a real food packet." }
+ACCEPTANCE CRITERIA (ACCEPT BOTH FOOD PACKETS AND NUTRITION FACTS / INGREDIENT LABELS):
+Accept this image as valid food/nutrition if it contains ANY of the following:
+1. Food Packets & Grocery Products: Any packaged snack, biscuit, chips, chocolate, drink, beverage bottle/can, dairy item, instant noodles, grocery item, condiment, fresh fruit, or edible dish.
+2. Food Nutrition Facts & Ingredient Labels: Any printed nutrition facts table, nutrient declaration (calories/energy, sugar, sodium, fat, protein, carbs), ingredients list, back or side label of food packaging.
 
-2. Is this an animal, dog, cat, bird, pet, insect, or wildlife?
-   -> DISQUALIFY IMMEDIATELY!
-   Return: { "isFood": false, "disqualificationType": "animal", "reason": "Animal or pet detected. Please point camera at a real packaged food or drink packet." }
+CRITICAL RULES FOR HANDS, FINGERS, AND WEBCAM FACES (DO NOT DISQUALIFY):
+- When users hold a food packet or nutrition facts label up to their webcam or phone camera, their fingers, hands, or thumbs holding the package or label are almost ALWAYS visible in the photo.
+- In desktop webcams, the user's face, head, or room background is often visible in the background while they hold up the food box, packet, or label.
+- YOU MUST NEVER DISQUALIFY OR REJECT AN IMAGE AS "PERSON", "FACE", OR "HUMAN" IF A FOOD PACKET, CAN, BOTTLE, NUTRITION FACTS TABLE, OR INGREDIENT LABEL IS BEING HELD UP OR DISPLAYED IN THE FRAME!
+- Ignore fingers, hands, and background webcam faces, and focus 100% on analyzing the food item or nutrition label in the frame.
 
-3. Is this a non-food household item, room, computer, screen, keyboard, desk, chair, car, wall, floor, furniture, electronic, book, or paper document?
-   -> DISQUALIFY IMMEDIATELY!
-   Return: { "isFood": false, "disqualificationType": "non-food", "reason": "No food packet detected. Please frame the front of a real packaged snack, food, or beverage." }
+DISQUALIFICATION (ONLY DISQUALIFY IF ZERO FOOD OR FOOD LABEL IS VISIBLE):
+- Only disqualify if the image is SOLELY a human selfie/face/portrait with NO food item, NO packet, and NO nutrition label anywhere in the picture.
+  Return: { "isFood": false, "disqualificationType": "person", "reason": "No food packet or nutrition facts label detected. Please hold up a food item or nutrition label." }
+- Only disqualify if the image is SOLELY an animal/pet with no food item or label.
+  Return: { "isFood": false, "disqualificationType": "animal", "reason": "Animal detected. Please hold up a food packet or nutrition facts label." }
+- Only disqualify if the image is an unrelated non-food object (e.g. empty floor, car, keyboard, wall, furniture) with NO food item or food label.
+  Return: { "isFood": false, "disqualificationType": "non-food", "reason": "No food packet or nutrition label detected. Please hold up a food packet or nutrition facts label." }
 
-ACCEPTANCE CRITERIA:
-Accept ONLY if the image shows:
-- A real packaged food packet, pouch, box, can, bottle, dairy product, instant food, beverage, grocery item, fresh fruit, or edible dish.
+ANALYSIS & EXTRACTION RULES:
+- If a nutrition facts panel or ingredient table is visible:
+  Read and extract the printed nutritional values directly into the nutrition object (calories, sugar, sodium, totalFat, saturatedFat, transFat, protein, fibre, ingredients).
+  Detect any brand name or product name printed on or near the label/packaging. If the exact brand name is not visible, use any visible product name or generic category (e.g. "Packaged Food Product" or "Nutrition Label Scan") and the correct category.
+- If the front of a food packet is visible:
+  Detect the exact product name, brand name, category, and provide the known or standard nutritional profile.
 
-If ACCEPTED, return:
+Return STRICT JSON matching this schema:
 {
   "isFood": true,
-  "productName": "Exact Brand and Product Name (e.g. Lay's Classic Salted Potato Chips)",
-  "brand": "Brand Name (e.g. Lay's)",
-  "category": "Chips & Namkeen | Biscuits | Beverages | Dairy | Instant Noodles | Chocolates | Groceries | etc.",
+  "productName": "Exact Brand and Product Name (or descriptive food name from label)",
+  "brand": "Brand Name (if visible or known, else '')",
+  "category": "Chips & Namkeen | Biscuits & Cookies | Beverages | Dairy | Instant Foods | Chocolates & Confectionery | Groceries | Packaged Food",
   "confidence": 0.95,
   "barcode": "",
   "nutrition": {
@@ -853,7 +862,7 @@ If ACCEPTED, return:
     "transFat": 0.1,
     "protein": 6.8,
     "fibre": 3.2,
-    "ingredients": ["Potatoes", "Edible Vegetable Oil", "Salt"],
+    "ingredients": ["..."],
     "allergens": [],
     "additives": []
   }
@@ -872,41 +881,44 @@ Return STRICT JSON only matching this schema.`;
         if (response.text) {
           const parsed = extractJson<any>(response.text);
           if (parsed) {
-            // Check for rejection
-            if (parsed.isFood === false || parsed.disqualificationType) {
+            // Check for rejection only if explicitly not food and no product info
+            if (parsed.isFood === false && !parsed.productName && !parsed.nutrition?.calories) {
               return res.status(422).json({
                 isFood: false,
                 disqualificationType: parsed.disqualificationType || 'non-food',
-                error: parsed.reason || 'Only real food or drink packets can be scanned. Please do not scan people, animals, or non-food objects.',
+                error: parsed.reason || 'Please hold up a food packet or nutrition facts label to scan.',
               });
             }
 
-            const rawName = parsed.productName || parsed.name;
-            if (!rawName || /unknown|unidentified|human|person|animal/i.test(rawName)) {
-              return res.status(422).json({
-                isFood: false,
-                disqualificationType: 'non-food',
-                error: 'Could not detect a clear food packet. Please point camera steadily at the front of a packaged food item.',
-              });
+            let rawName = parsed.productName || parsed.name;
+            if (!rawName || /unknown|unidentified/i.test(rawName)) {
+              rawName = parsed.brand ? `${parsed.brand} Food Product` : 'Packaged Food Product';
             }
 
-            // Real food packet identified! Fetch real web packaging photos!
-            const googleImages = await fetchProductWebImages(rawName, parsed.brand);
+            // Real food packet or nutrition label identified! Fetch real web packaging photos if specific
+            const googleImages = (rawName && !rawName.includes('Packaged Food Product'))
+              ? await fetchProductWebImages(rawName, parsed.brand)
+              : [];
 
-            // Check OpenFoodFacts official database for exact nutritional truth
-            const dbProduct = await searchOpenFoodFactsByName(rawName, parsed.brand);
-            if (dbProduct && dbProduct.nutrition && dbProduct.nutrition.calories > 0) {
-              parsed.isFood = true;
-              parsed.isVerifiedDatabase = true;
-              parsed.productName = rawName || dbProduct.productName;
-              parsed.brand = parsed.brand || dbProduct.brand || '';
-              parsed.barcode = dbProduct.barcode || parsed.barcode || '';
-              parsed.nutrition = dbProduct.nutrition;
-              if (dbProduct.imageUrl && !googleImages.includes(dbProduct.imageUrl)) {
-                googleImages.unshift(dbProduct.imageUrl);
+            // Check OpenFoodFacts official database for exact nutritional truth if product name is known
+            if (rawName && !rawName.includes('Packaged Food Product')) {
+              const dbProduct = await searchOpenFoodFactsByName(rawName, parsed.brand);
+              if (dbProduct && dbProduct.nutrition && dbProduct.nutrition.calories > 0) {
+                parsed.isFood = true;
+                parsed.isVerifiedDatabase = true;
+                parsed.productName = rawName || dbProduct.productName;
+                parsed.brand = parsed.brand || dbProduct.brand || '';
+                parsed.barcode = dbProduct.barcode || parsed.barcode || '';
+                // If scanned label had non-zero values, preserve them, otherwise use db values
+                parsed.nutrition = (parsed.nutrition && (parsed.nutrition.calories > 0 || parsed.nutrition.sugar > 0))
+                  ? parsed.nutrition
+                  : dbProduct.nutrition;
+                if (dbProduct.imageUrl && !googleImages.includes(dbProduct.imageUrl)) {
+                  googleImages.unshift(dbProduct.imageUrl);
+                }
+                parsed.googleImages = googleImages;
+                return res.json(parsed);
               }
-              parsed.googleImages = googleImages;
-              return res.json(parsed);
             }
 
             parsed.isFood = true;
@@ -929,7 +941,7 @@ Return STRICT JSON only matching this schema.`;
               fibre: parseFloat((Number(parsed.nutrition?.fibre) || 2).toFixed(1)),
               ingredients: Array.isArray(parsed.nutrition?.ingredients) && parsed.nutrition.ingredients.length > 0
                 ? parsed.nutrition.ingredients
-                : ['Grain / Potatoes / Flour', 'Edible Vegetable Oil', 'Iodised Salt'],
+                : ['Edible Ingredients', 'Spices & Condiments', 'Salt'],
               allergens: Array.isArray(parsed.nutrition?.allergens) ? parsed.nutrition.allergens : [],
               additives: Array.isArray(parsed.nutrition?.additives) ? parsed.nutrition.additives : [],
             };
@@ -940,7 +952,7 @@ Return STRICT JSON only matching this schema.`;
         console.warn('Gemini food recognition error:', err?.message || err);
         return res.status(422).json({
           isFood: false,
-          error: 'Could not clearly recognize a food packet. Please hold the front of the food packet steady, ensure good lighting, or search by product name.',
+          error: 'Could not clearly recognize a food packet or nutrition label. Please hold steady in good lighting, or search by product name.',
         });
       }
     }
@@ -1109,3 +1121,5 @@ async function startServer() {
 }
 
 startServer();
+
+export default app;

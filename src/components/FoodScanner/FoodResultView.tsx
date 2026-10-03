@@ -1,5 +1,7 @@
 import React, { useState, useEffect } from 'react';
+import { motion, AnimatePresence } from 'motion/react';
 import { FoodAnalysisResult, UserProfile, BetterAlternative } from '../../types';
+import { soundHaptics } from '../../utils/soundHaptics';
 import {
   ArrowLeft,
   ArrowRightLeft,
@@ -169,8 +171,11 @@ export const FoodResultView: React.FC<FoodResultViewProps> = ({
       {/* Top Floating Glass Navigation */}
       <div className="flex items-center justify-between pt-1">
         <button
-          onClick={onBack}
-          className="flex items-center gap-1.5 text-xs font-medium text-[#161616] hover:text-black py-1.5 px-3 rounded-full liquid-glass-capsule liquid-ripple active:scale-[0.98] transition-all"
+          onClick={() => {
+            soundHaptics.playTap();
+            onBack();
+          }}
+          className="flex items-center gap-1.5 text-xs font-medium text-[#1A1A18] hover:text-black py-1.5 px-3 rounded-full liquid-glass-capsule border border-amber-200/60 liquid-ripple active:scale-[0.98] transition-all cursor-pointer"
         >
           <ArrowLeft className="w-3.5 h-3.5" />
           <span>{isHindi ? 'वापस' : isBengali ? 'পেছনে' : 'Home'}</span>
@@ -179,35 +184,46 @@ export const FoodResultView: React.FC<FoodResultViewProps> = ({
         <div className="flex items-center gap-2">
           {/* Calm Audio Speak Action */}
           <button
-            onClick={handleToggleSpeak}
-            className={`flex items-center gap-1.5 text-xs font-medium py-1.5 px-3 rounded-full liquid-glass-capsule liquid-ripple active:scale-[0.98] transition-all ${
+            onClick={() => {
+              soundHaptics.playTap();
+              handleToggleSpeak();
+            }}
+            className={`flex items-center gap-1.5 text-xs font-medium py-1.5 px-3 rounded-full liquid-glass-capsule border border-amber-200/60 liquid-ripple active:scale-[0.98] transition-all cursor-pointer ${
               isSpeaking
-                ? 'bg-rose-50/90 text-rose-800 border-rose-200'
-                : 'text-[#161616]'
+                ? 'bg-amber-100/90 text-amber-900 border-amber-300'
+                : 'text-[#1A1A18]'
             }`}
             title="Read summary"
           >
             {isSpeaking ? (
-              <VolumeX className="w-3.5 h-3.5 text-rose-600" />
+              <VolumeX className="w-3.5 h-3.5 text-amber-700" />
             ) : (
-              <Volume2 className="w-3.5 h-3.5 text-[#737373]" />
+              <Volume2 className="w-3.5 h-3.5 text-[#78716C]" />
             )}
             <span>{isSpeaking ? 'Stop' : isHindi ? 'सुनें' : 'Listen'}</span>
           </button>
 
           <button
-            onClick={onScanAnother}
-            className="text-xs font-medium text-[#161616] py-1.5 px-3 rounded-full bg-[#F0EFEA] hover:bg-[#EAE9E4] liquid-ripple active:scale-[0.98] transition-all"
+            onClick={() => {
+              soundHaptics.playTap();
+              onScanAnother();
+            }}
+            className="text-xs font-medium text-[#1A1A18] py-1.5 px-3 rounded-full bg-amber-100/70 hover:bg-amber-100 border border-amber-200/70 liquid-ripple active:scale-[0.98] transition-all cursor-pointer shadow-2xs"
           >
             {isHindi ? 'नया स्कैन' : isBengali ? 'নতুন স্ক্যান' : 'Scan Another'}
           </button>
         </div>
       </div>
 
-      {/* Main Scanned Product Container (Clean Flat Spacious Card with soft depth) */}
-      <div className="bg-white rounded-[24px] p-6 border border-black/[0.06] shadow-[0_2px_16px_rgba(0,0,0,0.03)] space-y-6">
-        {/* Scanned Product Image is the Visual Hero */}
-        <div className="relative w-full h-56 rounded-[20px] overflow-hidden bg-[#F7F7F5] flex items-center justify-center border border-black/[0.04] animate-fade-in">
+      {/* Main Scanned Product Container (Apple Liquid Glass Card) */}
+      <div className="liquid-glass-card rounded-[24px] p-5.5 space-y-5 shadow-[0_12px_36px_-4px_rgba(0,0,0,0.05)]">
+        {/* Scanned Product Image is the Visual Hero with shared layoutId */}
+        <motion.div
+          layoutId={`food-hero-img-${result.id || result.productName}`}
+          transition={{ type: 'spring', stiffness: 520, damping: 36, mass: 0.7 }}
+          style={{ willChange: 'transform', transform: 'translateZ(0)' }}
+          className="relative w-full h-56 rounded-[20px] overflow-hidden bg-[#F7F7F5] flex items-center justify-center border border-black/[0.04]"
+        >
           {selectedImageUrl || result.imageUrl ? (
             <img
               src={selectedImageUrl || result.imageUrl}
@@ -220,7 +236,7 @@ export const FoodResultView: React.FC<FoodResultViewProps> = ({
               <span className="text-xs">Product Image</span>
             </div>
           )}
-        </div>
+        </motion.div>
 
         {/* Real Photos Found on Google / Web Gallery Strip */}
         {result.referenceImages && result.referenceImages.length > 0 && (
@@ -296,9 +312,14 @@ export const FoodResultView: React.FC<FoodResultViewProps> = ({
               </span>
             )}
           </div>
-          <h1 className="text-2xl font-bold tracking-tight text-[#161616]">
+          <motion.h1
+            layoutId={`food-hero-title-${result.id || result.productName}`}
+            transition={{ type: 'spring', stiffness: 520, damping: 36, mass: 0.7 }}
+            style={{ willChange: 'transform', transform: 'translateZ(0)' }}
+            className="text-2xl font-bold tracking-tight text-[#161616]"
+          >
             {result.productName}
-          </h1>
+          </motion.h1>
           <div className="flex items-center gap-2 flex-wrap pt-0.5">
             <span className="text-sm text-[#737373]">{result.category}</span>
             {result.isVerifiedDatabase && (
@@ -360,24 +381,24 @@ export const FoodResultView: React.FC<FoodResultViewProps> = ({
         {/* Nutrition values in one clean horizontal row */}
         <div className="pt-2 border-t border-black/[0.04] animate-fade-in">
           <div className="grid grid-cols-5 gap-2 text-center">
-            <div className={`p-2.5 rounded-2xl ${getNutrientStyle(result.nutrition.sugar, false)}`}>
-              <span className="text-[11px] text-[#737373] block">Sugar</span>
+            <div className={`p-2 rounded-2xl liquid-glass-capsule spring-bounce ${getNutrientStyle(result.nutrition.sugar, false)}`}>
+              <span className="text-[10px] text-[#737373] block">Sugar</span>
               <span className="text-xs font-semibold block mt-0.5">{result.nutrition.sugar}</span>
             </div>
-            <div className={`p-2.5 rounded-2xl ${getNutrientStyle(result.nutrition.sodium, false)}`}>
-              <span className="text-[11px] text-[#737373] block">Salt</span>
+            <div className={`p-2 rounded-2xl liquid-glass-capsule spring-bounce ${getNutrientStyle(result.nutrition.sodium, false)}`}>
+              <span className="text-[10px] text-[#737373] block">Salt</span>
               <span className="text-xs font-semibold block mt-0.5">{result.nutrition.sodium}</span>
             </div>
-            <div className={`p-2.5 rounded-2xl ${getNutrientStyle(result.nutrition.fat, false)}`}>
-              <span className="text-[11px] text-[#737373] block">Fat</span>
+            <div className={`p-2 rounded-2xl liquid-glass-capsule spring-bounce ${getNutrientStyle(result.nutrition.fat, false)}`}>
+              <span className="text-[10px] text-[#737373] block">Fat</span>
               <span className="text-xs font-semibold block mt-0.5">{result.nutrition.fat}</span>
             </div>
-            <div className={`p-2.5 rounded-2xl ${getNutrientStyle(result.nutrition.protein, true)}`}>
-              <span className="text-[11px] text-[#737373] block">Protein</span>
+            <div className={`p-2 rounded-2xl liquid-glass-capsule spring-bounce ${getNutrientStyle(result.nutrition.protein, true)}`}>
+              <span className="text-[10px] text-[#737373] block">Protein</span>
               <span className="text-xs font-semibold block mt-0.5">{result.nutrition.protein}</span>
             </div>
-            <div className={`p-2.5 rounded-2xl ${getNutrientStyle(result.nutrition.fibre, true)}`}>
-              <span className="text-[11px] text-[#737373] block">Fibre</span>
+            <div className={`p-2 rounded-2xl liquid-glass-capsule spring-bounce ${getNutrientStyle(result.nutrition.fibre, true)}`}>
+              <span className="text-[10px] text-[#737373] block">Fibre</span>
               <span className="text-xs font-semibold block mt-0.5">{result.nutrition.fibre}</span>
             </div>
           </div>
@@ -474,22 +495,42 @@ export const FoodResultView: React.FC<FoodResultViewProps> = ({
           </div>
 
           {/* Liquid Sliding Tab Control */}
-          <div className="relative flex p-0.5 liquid-glass-capsule rounded-full">
+          <div className="relative flex p-0.5 liquid-glass-capsule border border-amber-200/60 rounded-full">
             <button
-              onClick={() => setActiveTab('brand')}
-              className={`relative px-3 py-1 text-xs rounded-full transition-all duration-200 z-10 liquid-ripple ${
-                activeTab === 'brand' ? 'bg-[#161616] text-white shadow-xs font-semibold' : 'text-[#737373] hover:text-[#161616]'
-              }`}
+              onClick={() => {
+                soundHaptics.playPop();
+                setActiveTab('brand');
+              }}
+              className="relative px-3 py-1 text-xs rounded-full transition-colors duration-200 z-10 active:scale-95 cursor-pointer font-medium"
             >
-              <span>{isHindi ? 'ब्रांड्स' : isBengali ? 'ব্র্যান্ড' : 'Brands'}</span>
+              {activeTab === 'brand' && (
+                <motion.div
+                  layoutId="activeAltTabPill"
+                  className="absolute inset-0 bg-[#1A1A18] rounded-full shadow-xs -z-10 border border-amber-400/30"
+                  transition={{ type: 'spring', stiffness: 500, damping: 35 }}
+                />
+              )}
+              <span className={activeTab === 'brand' ? 'text-white font-semibold' : 'text-[#78716C]'}>
+                {isHindi ? 'ब्रांड्स' : isBengali ? 'ব্র্যান্ড' : 'Brands'}
+              </span>
             </button>
             <button
-              onClick={() => setActiveTab('fresh')}
-              className={`relative px-3 py-1 text-xs rounded-full transition-all duration-200 z-10 liquid-ripple ${
-                activeTab === 'fresh' ? 'bg-[#161616] text-white shadow-xs font-semibold' : 'text-[#737373] hover:text-[#161616]'
-              }`}
+              onClick={() => {
+                soundHaptics.playPop();
+                setActiveTab('fresh');
+              }}
+              className="relative px-3 py-1 text-xs rounded-full transition-colors duration-200 z-10 active:scale-95 cursor-pointer font-medium"
             >
-              <span>{isHindi ? 'प्राकृतिक' : isBengali ? 'প্রাকৃতিক' : 'Whole food'}</span>
+              {activeTab === 'fresh' && (
+                <motion.div
+                  layoutId="activeAltTabPill"
+                  className="absolute inset-0 bg-[#1A1A18] rounded-full shadow-xs -z-10 border border-amber-400/30"
+                  transition={{ type: 'spring', stiffness: 500, damping: 35 }}
+                />
+              )}
+              <span className={activeTab === 'fresh' ? 'text-white font-semibold' : 'text-[#78716C]'}>
+                {isHindi ? 'प्राकृतिक' : isBengali ? 'প্রাকৃতিক' : 'Whole food'}
+              </span>
             </button>
           </div>
         </div>
@@ -503,7 +544,7 @@ export const FoodResultView: React.FC<FoodResultViewProps> = ({
             return (
               <div
                 key={index}
-                className="bg-white rounded-[22px] p-5 border border-black/[0.06] shadow-[0_2px_12px_rgba(0,0,0,0.03)] space-y-3 transition-all hover:border-black/[0.12]"
+                className="liquid-glass-card liquid-glass-card-interactive liquid-glass-sheen rounded-[22px] p-5 space-y-3 transition-all duration-300"
               >
                 {/* Brand Badge & Budget Label */}
                 <div className="flex items-center justify-between gap-2">

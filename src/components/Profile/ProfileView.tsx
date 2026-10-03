@@ -1,7 +1,9 @@
 import React from 'react';
 import { UserProfile, Language, UserAccount } from '../../types';
-import { HeartPulse, ShieldAlert, Globe, User, Check } from 'lucide-react';
+import { HeartPulse, ShieldAlert, Globe, User, Check, Sparkles } from 'lucide-react';
+import { motion } from 'motion/react';
 import { MadeByFooter } from '../Common/MadeByFooter';
+import { soundHaptics } from '../../utils/soundHaptics';
 
 interface ProfileViewProps {
   profile: UserProfile;
@@ -32,6 +34,7 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
   const commonAllergies = ['Gluten', 'Peanuts', 'Dairy', 'Soy', 'Tree Nuts', 'Shellfish'];
 
   const toggleCondition = (key: keyof UserProfile['conditions']) => {
+    soundHaptics.playPop();
     onUpdateProfile({
       ...profile,
       conditions: {
@@ -42,6 +45,7 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
   };
 
   const toggleAllergy = (allergy: string) => {
+    soundHaptics.playPop();
     const exists = profile.allergies.includes(allergy);
     const updated = exists
       ? profile.allergies.filter((a) => a !== allergy)
@@ -53,13 +57,16 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
   };
 
   return (
-    <div className="space-y-6 pb-24">
+    <div className="space-y-4 pb-24 animate-fade-in font-sans">
       {/* Page Header */}
       <div className="pt-1 px-1">
-        <h2 className="text-xl font-bold tracking-tight text-[#161616]">
-          {isHindi ? 'स्वास्थ्य प्रोफ़ाइल' : isBengali ? 'স্বাস্থ্য প্রোফাইল' : 'Health Profile'}
-        </h2>
-        <p className="text-xs text-[#737373]">
+        <div className="flex items-center gap-1.5">
+          <h2 className="text-xl font-bold tracking-tight text-[#1A1A18]">
+            {isHindi ? 'स्वास्थ्य प्रोफ़ाइल' : isBengali ? 'স্বাস্থ্য প্রোফাইল' : 'Health Profile'}
+          </h2>
+          <span className="text-xs">🌿</span>
+        </div>
+        <p className="text-xs text-[#78716C]">
           {isHindi
             ? 'आपके अनुसार व्यक्तिगत स्वास्थ्य स्कोर और चेतावनियां'
             : isBengali
@@ -69,7 +76,7 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
       </div>
 
       {/* Google Account Sync Card */}
-      <div className="bg-white rounded-[24px] p-5 border border-black/[0.06] shadow-[0_2px_12px_rgba(0,0,0,0.03)] space-y-3">
+      <div className="liquid-glass-card rounded-[24px] p-5 space-y-3 shadow-xs border border-[#F3E8C8]">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
             <svg viewBox="0 0 24 24" className="w-4 h-4">
@@ -78,7 +85,7 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
               <path fill="#FBBC05" d="M5.28 14.28c-.25-.72-.38-1.49-.38-2.28s.13-1.56.38-2.28V6.59H1.26C.46 8.19 0 9.99 0 12s.46 3.81 1.26 5.41l4.02-3.13z"/>
               <path fill="#EA4335" d="M12 4.75c1.77 0 3.35.61 4.6 1.8l3.42-3.42C17.95 1.19 15.24 0 12 0 7.33 0 3.26 2.64 1.26 6.59l4.02 3.13c.95-2.83 3.6-4.97 6.72-4.97z"/>
             </svg>
-            <h3 className="text-xs font-semibold uppercase tracking-wider text-[#161616]">
+            <h3 className="text-xs font-semibold uppercase tracking-wider text-[#1A1A18]">
               Google Account
             </h3>
           </div>
@@ -96,26 +103,32 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
               <img
                 src={currentUser.avatar || `https://api.dicebear.com/7.x/notionists/svg?seed=${encodeURIComponent(currentUser.email)}`}
                 alt={currentUser.name}
-                className="w-11 h-11 rounded-full object-cover border border-emerald-500/30 shrink-0"
+                className="w-11 h-11 rounded-full object-cover border border-amber-300 shrink-0 shadow-xs"
               />
               <div className="min-w-0">
-                <p className="text-xs font-semibold text-[#161616] truncate">{currentUser.name}</p>
-                <p className="text-[11px] text-[#737373] truncate font-mono">{currentUser.email}</p>
+                <p className="text-xs font-semibold text-[#1A1A18] truncate">{currentUser.name}</p>
+                <p className="text-[11px] text-[#78716C] truncate font-mono">{currentUser.email}</p>
               </div>
             </div>
             <div className="flex items-center gap-1.5 shrink-0">
               {onOpenGoogleAuth && (
                 <button
-                  onClick={onOpenGoogleAuth}
-                  className="px-2.5 py-1.5 rounded-full bg-[#F0EFEA] hover:bg-[#EAE9E4] text-xs font-medium text-[#161616] active:scale-95 transition-all"
+                  onClick={() => {
+                    soundHaptics.playTap();
+                    onOpenGoogleAuth();
+                  }}
+                  className="px-2.5 py-1.5 rounded-full liquid-glass-capsule border border-amber-200/60 text-xs font-medium text-[#1A1A18] active:scale-95 transition-all cursor-pointer"
                 >
                   Manage
                 </button>
               )}
               {onLogout && (
                 <button
-                  onClick={onLogout}
-                  className="px-2.5 py-1.5 rounded-full bg-rose-50 hover:bg-rose-100 text-xs font-medium text-rose-700 active:scale-95 transition-all"
+                  onClick={() => {
+                    soundHaptics.playTap();
+                    onLogout();
+                  }}
+                  className="px-2.5 py-1.5 rounded-full bg-rose-50/80 hover:bg-rose-100 text-xs font-medium text-rose-700 active:scale-95 transition-all cursor-pointer border border-rose-200/50"
                 >
                   Sign Out
                 </button>
@@ -124,13 +137,16 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
           </div>
         ) : (
           <div className="space-y-3 pt-1">
-            <p className="text-xs text-[#737373] leading-relaxed">
+            <p className="text-xs text-[#78716C] leading-relaxed">
               Sign in with your Google account to backup your health profile, conditions, and scan history safely in the cloud.
             </p>
             {onOpenGoogleAuth && (
               <button
-                onClick={onOpenGoogleAuth}
-                className="w-full py-2.5 rounded-full bg-[#161616] text-white text-xs font-semibold flex items-center justify-center gap-2 active:scale-95 transition-transform shadow-xs"
+                onClick={() => {
+                  soundHaptics.playTap();
+                  onOpenGoogleAuth();
+                }}
+                className="w-full py-2.5 rounded-full bg-[#1A1A18] text-white text-xs font-semibold flex items-center justify-center gap-2 active:scale-95 transition-transform shadow-xs cursor-pointer spring-bounce border border-amber-400/30"
               >
                 <svg viewBox="0 0 24 24" className="w-3.5 h-3.5">
                   <path fill="#4285F4" d="M23.745 12.27c0-.7-.06-1.4-.19-2.07H12v4.51h6.6c-.29 1.52-1.14 2.8-2.4 3.66v3.04h3.88c2.27-2.09 3.665-5.17 3.665-9.14z"/>
@@ -146,15 +162,15 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
       </div>
 
       {/* Language Selection Card with Liquid Sliding Indicator */}
-      <div className="bg-white rounded-[24px] p-5 border border-black/[0.06] shadow-[0_2px_12px_rgba(0,0,0,0.03)] space-y-3">
+      <div className="liquid-glass-card rounded-[24px] p-5 space-y-3 shadow-xs border border-[#F3E8C8]">
         <div className="flex items-center gap-2">
-          <Globe className="w-4 h-4 text-[#161616]" />
-          <h3 className="text-xs font-semibold uppercase tracking-wider text-[#161616]">
+          <Globe className="w-4 h-4 text-amber-700" />
+          <h3 className="text-xs font-semibold uppercase tracking-wider text-[#1A1A18]">
             {isHindi ? 'पसंदीदा भाषा' : isBengali ? 'পছন্দের ভাষা' : 'App Language'}
           </h3>
         </div>
 
-        <div className="grid grid-cols-3 gap-2 p-1 bg-[#F0EFEA] rounded-2xl relative">
+        <div className="grid grid-cols-3 gap-2 p-1 liquid-glass-capsule border border-amber-200/60 rounded-2xl relative shadow-xs">
           {[
             { id: 'en' as Language, label: 'English' },
             { id: 'hi' as Language, label: 'हिंदी' },
@@ -164,12 +180,22 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
             return (
               <button
                 key={l.id}
-                onClick={() => onUpdateProfile({ ...profile, language: l.id })}
-                className={`relative py-2.5 px-3 rounded-xl text-xs font-semibold transition-all duration-200 text-center liquid-ripple z-10 ${
-                  isSelected ? 'bg-white text-[#161616] shadow-xs border border-black/[0.04]' : 'text-[#737373] hover:text-[#161616]'
-                }`}
+                onClick={() => {
+                  soundHaptics.playTap();
+                  onUpdateProfile({ ...profile, language: l.id });
+                }}
+                className="relative py-2.5 px-3 rounded-xl text-xs font-semibold transition-colors duration-200 text-center active:scale-95 cursor-pointer z-10"
               >
-                <span>{l.label}</span>
+                {isSelected && (
+                  <motion.div
+                    layoutId="activeProfileLangPill"
+                    className="absolute inset-0 bg-white rounded-xl shadow-xs border border-amber-200/50 -z-10"
+                    transition={{ type: 'spring', stiffness: 500, damping: 35 }}
+                  />
+                )}
+                <span className={isSelected ? 'text-[#1A1A18]' : 'text-[#78716C]'}>
+                  {l.label}
+                </span>
               </button>
             );
           })}
@@ -177,10 +203,10 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
       </div>
 
       {/* Age Group Card with Liquid Sliding Pill */}
-      <div className="bg-white rounded-[24px] p-5 border border-black/[0.06] shadow-[0_2px_12px_rgba(0,0,0,0.03)] space-y-3">
+      <div className="liquid-glass-card rounded-[24px] p-5 space-y-3 shadow-xs border border-[#F3E8C8]">
         <div className="flex items-center gap-2">
-          <User className="w-4 h-4 text-[#161616]" />
-          <h3 className="text-xs font-semibold uppercase tracking-wider text-[#161616]">
+          <User className="w-4 h-4 text-amber-700" />
+          <h3 className="text-xs font-semibold uppercase tracking-wider text-[#1A1A18]">
             {isHindi ? 'आयु वर्ग' : isBengali ? 'বয়স সীমা' : 'Age Range'}
           </h3>
         </div>
@@ -191,11 +217,14 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
             return (
               <button
                 key={age}
-                onClick={() => onUpdateProfile({ ...profile, ageRange: age })}
-                className={`relative py-1.5 px-3.5 rounded-full text-xs font-semibold transition-all liquid-ripple ${
+                onClick={() => {
+                  soundHaptics.playTap();
+                  onUpdateProfile({ ...profile, ageRange: age });
+                }}
+                className={`relative py-1.5 px-3.5 rounded-full text-xs font-semibold transition-all duration-200 active:scale-95 cursor-pointer spring-bounce border ${
                   isSelected
-                    ? 'bg-[#161616] text-white shadow-xs'
-                    : 'bg-[#F0EFEA] text-[#161616] hover:bg-[#EAE9E4]'
+                    ? 'bg-[#1A1A18] text-white shadow-xs border-amber-400/30'
+                    : 'liquid-glass-capsule border-amber-200/50 text-[#1A1A18] hover:bg-white'
                 }`}
               >
                 {age}
@@ -206,10 +235,10 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
       </div>
 
       {/* Health Conditions Toggles */}
-      <div className="bg-white rounded-[24px] p-5 border border-black/[0.06] shadow-[0_2px_12px_rgba(0,0,0,0.03)] space-y-3">
+      <div className="liquid-glass-card rounded-[24px] p-5 space-y-3 shadow-xs border border-[#F3E8C8]">
         <div className="flex items-center gap-2">
           <HeartPulse className="w-4 h-4 text-emerald-600" />
-          <h3 className="text-xs font-semibold uppercase tracking-wider text-[#161616]">
+          <h3 className="text-xs font-semibold uppercase tracking-wider text-[#1A1A18]">
             {isHindi ? 'स्वास्थ्य स्थितियां' : isBengali ? 'শারীরিক অবস্থা' : 'Health Conditions'}
           </h3>
         </div>
@@ -242,19 +271,19 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
               <button
                 key={cond.key}
                 onClick={() => toggleCondition(cond.key)}
-                className={`w-full text-left p-3.5 rounded-2xl border transition-all flex items-center justify-between gap-3 liquid-ripple ${
+                className={`w-full text-left p-3.5 rounded-2xl border transition-all duration-300 flex items-center justify-between gap-3 active:scale-[0.985] cursor-pointer ${
                   active
-                    ? 'bg-emerald-50/70 border-emerald-300 shadow-2xs'
-                    : 'bg-[#F7F7F5] border-black/[0.04] hover:border-black/[0.1]'
+                    ? 'bg-emerald-50/80 border-emerald-300/80 shadow-xs'
+                    : 'liquid-glass-capsule border-amber-200/40 hover:border-amber-300/60'
                 }`}
               >
                 <div className="space-y-0.5">
-                  <h4 className="text-xs font-semibold text-[#161616]">{cond.title}</h4>
-                  <p className="text-[11px] text-[#737373]">{cond.desc}</p>
+                  <h4 className="text-xs font-semibold text-[#1A1A18]">{cond.title}</h4>
+                  <p className="text-[11px] text-[#78716C]">{cond.desc}</p>
                 </div>
                 <div
-                  className={`w-6 h-6 rounded-full flex items-center justify-center shrink-0 transition-colors ${
-                    active ? 'bg-emerald-600 text-white' : 'border-2 border-black/20'
+                  className={`w-6 h-6 rounded-full flex items-center justify-center shrink-0 transition-all duration-200 ${
+                    active ? 'bg-emerald-600 text-white shadow-[0_0_8px_rgba(16,185,129,0.7)]' : 'border-2 border-amber-300/60'
                   }`}
                 >
                   {active && <Check className="w-3.5 h-3.5 stroke-[3]" />}
@@ -266,14 +295,14 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
       </div>
 
       {/* Allergies Card */}
-      <div className="bg-white rounded-[24px] p-5 border border-black/[0.06] shadow-[0_2px_12px_rgba(0,0,0,0.03)] space-y-3">
+      <div className="liquid-glass-card rounded-[24px] p-5 space-y-3 shadow-xs border border-[#F3E8C8]">
         <div className="flex items-center gap-2">
           <ShieldAlert className="w-4 h-4 text-rose-600" />
-          <h3 className="text-xs font-semibold uppercase tracking-wider text-[#161616]">
+          <h3 className="text-xs font-semibold uppercase tracking-wider text-[#1A1A18]">
             {isHindi ? 'एलर्जी सावधानियां' : isBengali ? 'অ্যালার্জি' : 'Food Allergies'}
           </h3>
         </div>
-        <p className="text-[11px] text-[#737373]">
+        <p className="text-[11px] text-[#78716C]">
           {isHindi ? 'पैकेट सामग्री में पाए जाने पर तत्काल चेतावनी दी जाएगी' : isBengali ? 'উপাদান তালিকায় থাকলে লাল সতর্কতা প্রদর্শন করা হবে' : 'Immediate red warning if detected in scanned ingredients'}
         </p>
 
@@ -284,10 +313,10 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
               <button
                 key={allergy}
                 onClick={() => toggleAllergy(allergy)}
-                className={`py-1.5 px-3.5 rounded-full text-xs font-semibold border transition-all liquid-ripple ${
+                className={`py-1.5 px-3.5 rounded-full text-xs font-semibold border transition-all duration-200 active:scale-95 cursor-pointer spring-bounce ${
                   isSelected
                     ? 'bg-rose-50 text-rose-900 border-rose-300 shadow-xs'
-                    : 'bg-[#F0EFEA] text-[#161616] border-black/[0.04] hover:bg-[#EAE9E4]'
+                    : 'liquid-glass-capsule border-amber-200/50 text-[#1A1A18] hover:bg-white'
                 }`}
               >
                 {allergy}

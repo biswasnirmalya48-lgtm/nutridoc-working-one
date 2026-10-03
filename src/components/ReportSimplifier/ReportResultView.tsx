@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { ReportAnalysisResult, UserProfile } from '../../types';
+import { soundHaptics } from '../../utils/soundHaptics';
 import {
   ArrowLeft,
   Volume2,
@@ -39,6 +40,7 @@ export const ReportResultView: React.FC<ReportResultViewProps> = ({
   const [checkedDoses, setCheckedDoses] = useState<Record<string, boolean>>({});
 
   const toggleDose = (key: string) => {
+    soundHaptics.playPop();
     setCheckedDoses((prev) => ({ ...prev, [key]: !prev[key] }));
   };
 
@@ -83,8 +85,11 @@ export const ReportResultView: React.FC<ReportResultViewProps> = ({
       <div className="flex items-center justify-between pt-1">
         <button
           type="button"
-          onClick={onBack}
-          className="flex items-center gap-1.5 text-xs font-medium text-[#161616] hover:text-black py-1.5 px-3 rounded-full liquid-glass-capsule liquid-ripple active:scale-[0.98] transition-all cursor-pointer"
+          onClick={() => {
+            soundHaptics.playTap();
+            onBack();
+          }}
+          className="flex items-center gap-1.5 text-xs font-medium text-[#1A1A18] hover:text-black py-1.5 px-3 rounded-full liquid-glass-capsule border border-amber-200/60 liquid-ripple active:scale-[0.98] transition-all cursor-pointer"
         >
           <ArrowLeft className="w-3.5 h-3.5" />
           <span>{isHindi ? 'होम' : isBengali ? 'হোম' : 'Home'}</span>
@@ -94,26 +99,32 @@ export const ReportResultView: React.FC<ReportResultViewProps> = ({
           {/* Read aloud action */}
           <button
             type="button"
-            onClick={handleToggleSpeak}
-            className={`flex items-center gap-1.5 text-xs font-medium py-1.5 px-3 rounded-full liquid-glass-capsule liquid-ripple active:scale-[0.98] transition-all cursor-pointer ${
+            onClick={() => {
+              soundHaptics.playTap();
+              handleToggleSpeak();
+            }}
+            className={`flex items-center gap-1.5 text-xs font-medium py-1.5 px-3 rounded-full liquid-glass-capsule border border-amber-200/60 liquid-ripple active:scale-[0.98] transition-all cursor-pointer ${
               isSpeaking
-                ? 'bg-rose-50/90 text-rose-800 border-rose-200'
-                : 'text-[#161616]'
+                ? 'bg-amber-100/90 text-amber-900 border-amber-300'
+                : 'text-[#1A1A18]'
             }`}
             title="Listen to summary"
           >
             {isSpeaking ? (
-              <VolumeX className="w-3.5 h-3.5 text-rose-600 animate-pulse" />
+              <VolumeX className="w-3.5 h-3.5 text-amber-700 animate-pulse" />
             ) : (
-              <Volume2 className="w-3.5 h-3.5 text-[#737373]" />
+              <Volume2 className="w-3.5 h-3.5 text-[#78716C]" />
             )}
             <span>{isSpeaking ? 'Stop' : isHindi ? 'सुनें' : isBengali ? 'শুনুন' : 'Listen'}</span>
           </button>
 
           <button
             type="button"
-            onClick={onScanAnother}
-            className="text-xs font-medium text-[#161616] py-1.5 px-3.5 rounded-full bg-[#161616] text-white hover:bg-neutral-800 liquid-ripple active:scale-[0.98] transition-all cursor-pointer shadow-xs"
+            onClick={() => {
+              soundHaptics.playTap();
+              onScanAnother();
+            }}
+            className="text-xs font-medium text-[#1A1A18] py-1.5 px-3.5 rounded-full bg-amber-100/70 hover:bg-amber-100 border border-amber-200/70 liquid-ripple active:scale-[0.98] transition-all cursor-pointer shadow-2xs"
           >
             {isHindi ? 'नया स्कैन' : isBengali ? 'নতুন স্ক্যান' : 'Scan Another'}
           </button>
@@ -121,7 +132,7 @@ export const ReportResultView: React.FC<ReportResultViewProps> = ({
       </div>
 
       {/* Main Prescription Summary Card */}
-      <div className="bg-white rounded-[24px] p-6 border border-black/[0.06] shadow-[0_2px_16px_rgba(0,0,0,0.03)] space-y-4">
+      <div className="liquid-glass-card liquid-glass-sheen rounded-[24px] p-5.5 space-y-4 shadow-[0_12px_36px_-4px_rgba(217,148,38,0.06)] border border-[#F3E8C8]">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
             <span className="w-10 h-10 rounded-2xl bg-[#161616] text-white flex items-center justify-center font-bold text-xs shadow-xs">
@@ -163,7 +174,7 @@ export const ReportResultView: React.FC<ReportResultViewProps> = ({
 
       {/* SECTION 1: WHAT HAPPENS TO THE USER (Diagnosis & Condition in Waterline Simple Language) */}
       {(result.patientCondition || isPrescription) && (
-        <div className="bg-white rounded-[24px] p-6 border border-emerald-500/20 shadow-[0_4px_20px_rgba(16,185,129,0.04)] space-y-4 relative overflow-hidden">
+        <div className="liquid-glass-card rounded-[24px] p-5.5 space-y-4 relative overflow-hidden border-emerald-500/25">
           <div className="absolute top-0 right-0 w-32 h-32 bg-emerald-100/30 rounded-full blur-2xl pointer-events-none" />
 
           {/* Section Header */}
@@ -251,7 +262,7 @@ export const ReportResultView: React.FC<ReportResultViewProps> = ({
               return (
                 <div
                   key={index}
-                  className="bg-white rounded-[24px] p-5 border border-black/[0.08] shadow-[0_2px_10px_rgba(0,0,0,0.03)] space-y-3.5 transition-all hover:border-black/[0.16]"
+                  className="liquid-glass-card liquid-glass-card-interactive liquid-glass-sheen rounded-[24px] p-5 space-y-3.5 transition-all duration-300"
                 >
                   {/* Medicine Name and Dosage / Confidence */}
                   <div className="flex items-start justify-between gap-2">

@@ -1,5 +1,7 @@
-import React from 'react';
+import React, { useState } from 'react';
+import { Volume2, VolumeX, Sparkles, Sun } from 'lucide-react';
 import { Language, UserAccount, UserProfile } from '../types';
+import { soundHaptics } from '../utils/soundHaptics';
 
 interface HeaderProps {
   profile: UserProfile;
@@ -16,6 +18,19 @@ export const Header: React.FC<HeaderProps> = ({
   onOpenProfile,
   onOpenGoogleAuth,
 }) => {
+  const [soundActive, setSoundActive] = useState(soundHaptics.isSoundEnabled());
+
+  const toggleSound = () => {
+    const nextState = !soundActive;
+    soundHaptics.setSoundEnabled(nextState);
+    setSoundActive(nextState);
+    if (nextState) {
+      soundHaptics.playSuccess();
+    } else {
+      soundHaptics.vibrate(20);
+    }
+  };
+
   const languages: { code: Language; label: string }[] = [
     { code: 'en', label: 'EN' },
     { code: 'hi', label: 'हिं' },
@@ -36,24 +51,52 @@ export const Header: React.FC<HeaderProps> = ({
 
   return (
     <div className="sticky top-2.5 z-40 w-full max-w-md mx-auto px-3.5 pointer-events-none">
-      <header className="pointer-events-auto liquid-glass-nav rounded-[22px] px-3.5 h-13 flex items-center justify-between transition-all">
-        {/* Brand */}
-        <div className="flex items-center gap-2">
-          <span className="text-[15px] font-bold tracking-tight text-[#161616]">
-            NutriDoc
-          </span>
-          <span className="text-[11px] text-[#737373] font-normal hidden sm:inline">
-            {profile.language === 'hi' ? 'स्वास्थ्य मार्गदर्शक' : profile.language === 'bn' ? 'স্বাস্থ্য সহায়ক' : 'Everyday Health'}
-          </span>
+      <header className="pointer-events-auto liquid-glass-nav rounded-[22px] px-3.5 h-13 flex items-center justify-between transition-all duration-300 hover:shadow-[0_12px_36px_-4px_rgba(217,148,38,0.12)] border border-[#F3E8C8]">
+        {/* Brand with Warm Natural Botanical Touch */}
+        <div className="flex items-center gap-1.5 group cursor-default">
+          <div className="w-5 h-5 rounded-full bg-gradient-to-br from-amber-400 via-amber-300 to-emerald-400 flex items-center justify-center shadow-[0_0_8px_rgba(245,158,11,0.5)]">
+            <span className="text-[10px]">🌱</span>
+          </div>
+          <div className="flex flex-col">
+            <span className="text-[14px] font-bold tracking-tight text-[#1A1A18] flex items-center gap-1">
+              NutriDoc
+              <span className="text-[9px] font-semibold text-amber-700 bg-amber-100/80 px-1 py-0.2 rounded-full border border-amber-300/60 leading-none">
+                Pure
+              </span>
+            </span>
+            <span className="text-[10px] text-[#78716C] font-normal leading-tight hidden sm:inline">
+              {profile.language === 'hi' ? 'प्राकृतिक स्वास्थ्य' : profile.language === 'bn' ? 'প্রাকৃতিক স্বাস্থ্য' : 'Natural Health'}
+            </span>
+          </div>
         </div>
 
         {/* Minimal Navigation Controls on the Right */}
         <div className="flex items-center gap-1.5">
+          {/* Sound & Touch Haptics Log / Toggle Pill */}
+          <button
+            onClick={toggleSound}
+            className={`p-1.5 rounded-full liquid-glass-capsule active:scale-90 transition-all flex items-center justify-center cursor-pointer border ${
+              soundActive
+                ? 'text-amber-800 border-amber-200/80 bg-amber-50/70 shadow-xs'
+                : 'text-[#A8A29E] border-black/[0.04]'
+            }`}
+            title={soundActive ? 'Sound & Touch Haptics: Active' : 'Sound & Touch Haptics: Muted'}
+          >
+            {soundActive ? (
+              <Volume2 className="w-3.5 h-3.5 text-amber-600 animate-pulse" />
+            ) : (
+              <VolumeX className="w-3.5 h-3.5 text-[#A8A29E]" />
+            )}
+          </button>
+
           {/* Google Login / Avatar Button */}
           {currentUser ? (
             <button
-              onClick={onOpenGoogleAuth}
-              className="relative p-0.5 rounded-full border border-black/10 hover:border-black/25 active:scale-95 transition-all shadow-xs flex items-center bg-white"
+              onClick={() => {
+                soundHaptics.playTap();
+                onOpenGoogleAuth();
+              }}
+              className="relative p-0.5 rounded-full border border-amber-200 hover:border-amber-400 active:scale-95 transition-all shadow-xs flex items-center bg-white spring-bounce cursor-pointer"
               title={`${currentUser.name} (${currentUser.email})`}
             >
               <img
@@ -61,12 +104,15 @@ export const Header: React.FC<HeaderProps> = ({
                 alt={currentUser.name}
                 className="w-6 h-6 rounded-full object-cover"
               />
-              <span className="w-2 h-2 rounded-full bg-emerald-500 absolute -bottom-0.5 -right-0.5 border border-white" />
+              <span className="w-2 h-2 rounded-full bg-emerald-500 absolute -bottom-0.5 -right-0.5 border border-white shadow-[0_0_4px_#10B981]" />
             </button>
           ) : (
             <button
-              onClick={onOpenGoogleAuth}
-              className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-white border border-black/10 shadow-xs hover:bg-[#F7F7F5] active:scale-95 transition-all text-[11px] font-semibold text-[#161616]"
+              onClick={() => {
+                soundHaptics.playTap();
+                onOpenGoogleAuth();
+              }}
+              className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-white/95 backdrop-blur-md border border-amber-200/70 shadow-xs hover:bg-amber-50/60 active:scale-95 transition-all text-[11px] font-semibold text-[#1A1A18] spring-bounce cursor-pointer"
               title="Sign in with Google"
             >
               <svg viewBox="0 0 24 24" className="w-3.5 h-3.5 shrink-0">
@@ -79,28 +125,36 @@ export const Header: React.FC<HeaderProps> = ({
             </button>
           )}
 
-          {/* Active Profile Health Pill with subtle refraction */}
+          {/* Active Profile Health Pill with Honey Chamomile highlight */}
           <button
-            onClick={onOpenProfile}
-            className="relative liquid-ripple text-xs text-[#525252] hover:text-[#161616] px-2.5 py-1 rounded-full liquid-glass-capsule active:scale-95 transition-all flex items-center gap-1"
+            onClick={() => {
+              soundHaptics.playTap();
+              onOpenProfile();
+            }}
+            className="relative liquid-ripple text-xs text-[#57534E] hover:text-[#1A1A18] px-2.5 py-1 rounded-full liquid-glass-capsule border border-amber-200/60 active:scale-95 transition-all flex items-center gap-1 spring-bounce cursor-pointer"
             title="Edit health profile"
           >
-            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500/80" />
-            <span className="font-medium text-[11px] max-w-[85px] truncate">
+            <span className="w-1.5 h-1.5 rounded-full bg-amber-500 shadow-[0_0_5px_rgba(245,158,11,0.8)]" />
+            <span className="font-medium text-[11px] max-w-[80px] truncate text-[#44403C]">
               {activeConditions.length > 0 ? activeConditions.slice(0, 2).join(' · ') : profile.ageRange}
             </span>
           </button>
 
-          {/* Liquid Language Switcher with sliding capsule */}
-          <div className="relative flex items-center bg-black/[0.03] p-0.5 rounded-full border border-black/[0.04]">
+          {/* Liquid Language Switcher */}
+          <div className="relative flex items-center bg-amber-100/40 p-0.5 rounded-full border border-amber-200/50 backdrop-blur-md">
             {languages.map((l) => {
               const isSelected = profile.language === l.code;
               return (
                 <button
                   key={l.code}
-                  onClick={() => onUpdateLanguage(l.code)}
-                  className={`relative px-2 py-0.5 text-[11px] font-medium rounded-full transition-all duration-200 z-10 ${
-                    isSelected ? 'bg-white text-[#161616] font-semibold shadow-xs' : 'text-[#737373] hover:text-[#161616]'
+                  onClick={() => {
+                    soundHaptics.playTap();
+                    onUpdateLanguage(l.code);
+                  }}
+                  className={`relative px-2 py-0.5 text-[11px] font-medium rounded-full transition-all duration-300 z-10 active:scale-90 cursor-pointer ${
+                    isSelected
+                      ? 'bg-white text-[#1A1A18] font-semibold shadow-xs scale-102 border border-amber-200/50'
+                      : 'text-[#78716C] hover:text-[#1A1A18]'
                   }`}
                 >
                   <span>{l.label}</span>

@@ -14,6 +14,8 @@ import {
   SkipForward,
 } from 'lucide-react';
 import { NutritionData, UserProfile } from '../../types';
+import { soundHaptics } from '../../utils/soundHaptics';
+import { MadeByFooter } from '../Common/MadeByFooter';
 
 interface CameraScannerProps {
   onCaptureComplete: (data: {
@@ -83,6 +85,15 @@ export const CameraScanner: React.FC<CameraScannerProps> = ({
   const isHindi = profile.language === 'hi';
   const isBengali = profile.language === 'bn';
 
+  // Tactile Vibration Helper (Physical Motion Haptics)
+  const triggerHaptic = (pattern: number | number[] = 25) => {
+    if (typeof navigator !== 'undefined' && 'vibrate' in navigator) {
+      try {
+        navigator.vibrate(pattern);
+      } catch {}
+    }
+  };
+
   // Audio chirp feedback for barcode scan
   const playBarcodeChirp = () => {
     try {
@@ -98,51 +109,76 @@ export const CameraScanner: React.FC<CameraScannerProps> = ({
       gain.connect(audioCtx.destination);
       osc.start();
       osc.stop(audioCtx.currentTime + 0.12);
-      if (navigator.vibrate) {
-        navigator.vibrate(60);
-      }
+      triggerHaptic([30, 40, 60]);
     } catch {}
   };
 
-  // Initialize camera for all steps
-  useEffect(() => {
-    let activeStream: MediaStream | null = null;
+  // Initialize camera for all steps with resilient fallbacks
+  const initCamera = async () => {
+    try {
+      setCameraError(null);
+      if (stream) {
+        stream.getTracks().forEach((track) => track.stop());
+      }
 
-    async function initCamera() {
+      if (!navigator?.mediaDevices?.getUserMedia) {
+        throw new Error('Camera not supported in this browser or iframe environment. Please upload a packet photo from your gallery.');
+      }
+
+      let newStream: MediaStream | null = null;
       try {
-        setCameraError(null);
-        if (stream) {
-          stream.getTracks().forEach((track) => track.stop());
-        }
-
-        const constraints: MediaStreamConstraints = {
+        // Attempt 1: Facing mode with ideal HD resolution
+        newStream = await navigator.mediaDevices.getUserMedia({
           video: {
             facingMode: { ideal: facingMode },
             width: { ideal: 1280 },
             height: { ideal: 720 },
           },
           audio: false,
-        };
-
-        const newStream = await navigator.mediaDevices.getUserMedia(constraints);
-        activeStream = newStream;
-        setStream(newStream);
-
-        if (videoRef.current) {
-          videoRef.current.srcObject = newStream;
-          videoRef.current.play().catch((err) => console.log('Video play error:', err));
+        });
+      } catch (firstErr) {
+        try {
+          // Attempt 2: Facing mode without resolution requirement
+          newStream = await navigator.mediaDevices.getUserMedia({
+            video: { facingMode: facingMode },
+            audio: false,
+          });
+        } catch (secondErr) {
+          // Attempt 3: Any available video stream
+          newStream = await navigator.mediaDevices.getUserMedia({
+            video: true,
+            audio: false,
+          });
         }
-      } catch (err: any) {
-        console.warn('Camera access denied or unavailable:', err);
-        setCameraError(err.message || 'Camera unavailable. Please upload a packet photo from your gallery or search by name.');
       }
-    }
 
+      if (!newStream) {
+        throw new Error('No camera stream could be acquired.');
+      }
+
+      setStream(newStream);
+
+      if (videoRef.current) {
+        videoRef.current.srcObject = newStream;
+        videoRef.current.setAttribute('playsinline', 'true');
+        videoRef.current.play().catch((err) => console.log('Video play error:', err));
+      }
+    } catch (err: any) {
+      console.warn('Camera access denied or unavailable:', err);
+      setCameraError(
+        err.name === 'NotAllowedError'
+          ? 'Camera permission was denied. Please allow camera permissions in your browser or upload a photo from your device.'
+          : err.message || 'Camera is currently unavailable. Please upload a photo from your gallery or search by name.'
+      );
+    }
+  };
+
+  useEffect(() => {
     initCamera();
 
     return () => {
-      if (activeStream) {
-        activeStream.getTracks().forEach((t) => t.stop());
+      if (stream) {
+        stream.getTracks().forEach((t) => t.stop());
       }
     };
   }, [facingMode]);
@@ -234,6 +270,8 @@ export const CameraScanner: React.FC<CameraScannerProps> = ({
                 if (barcodes.length > 0) {
                   const raw = barcodes[0].rawValue;
                   if (raw && raw.length >= 6) {
+                    // Tactile physical lock vibration on real-time barcode/object detection
+                    triggerHaptic([35, 45, 55]);
                     handleBarcodeLookup(raw);
                   }
                 }
@@ -300,15 +338,20 @@ export const CameraScanner: React.FC<CameraScannerProps> = ({
     const x = e.clientX - rect.left;
     const y = e.clientY - rect.top;
     setFocusRing({ x, y });
+    // Light physical autofocus tap
+    triggerHaptic(18);
     setTimeout(() => {
       setFocusRing(null);
     }, 750);
   };
 
-  // Trigger tactile shutter animation
+  // Trigger tactile shutter animation with mechanical recoil vibration and shutter sound
   const triggerShutterFeedback = () => {
     setIsCapturing(true);
     setShutterFlash(true);
+    // Tactile physical shutter capture recoil and acoustic snap
+    soundHaptics.playShutter();
+    triggerHaptic([45, 25, 70]);
     setTimeout(() => setShutterFlash(false), 200);
     setTimeout(() => setIsCapturing(false), 600);
   };
@@ -328,7 +371,7 @@ export const CameraScanner: React.FC<CameraScannerProps> = ({
     setIsProcessing(true);
     setScanError(null);
     setLoadingText(
-      isHindi ? 'पैकेट स्कैन किया जा रहा है…' : isBengali ? 'পণ্য স্ক্যান করা হচ্ছে…' : 'Scanning product'
+      isHindi ? 'पैकेट या न्यूट्रिशन लेबल स्कैन हो रहा है…' : isBengali ? 'প্যাকেট বা পুষ্টি লেবেল স্ক্যান করা হচ্ছে…' : 'Scanning packet or nutrition label…'
     );
 
     if (capturedImg) {
@@ -349,7 +392,7 @@ export const CameraScanner: React.FC<CameraScannerProps> = ({
       if (res.ok) {
         const data = await res.json();
         if (data.isFood === false || data.error) {
-          throw new Error(data.error || 'Only real food or drink packets can be scanned. Please do not scan people, animals, or non-food objects.');
+          throw new Error(data.error || 'Please hold up a food packet or nutrition facts label to scan.');
         }
 
         const validWebImages = Array.isArray(data.googleImages) ? data.googleImages : [];
@@ -361,6 +404,9 @@ export const CameraScanner: React.FC<CameraScannerProps> = ({
             setFrontImage(data.imageUrl);
           }
         }
+
+        // Tactile double-pulse motion confirming successful object detection
+        triggerHaptic([40, 50, 45]);
 
         setProductMetadata({
           name: data.productName || 'Recognized Product',
@@ -377,7 +423,7 @@ export const CameraScanner: React.FC<CameraScannerProps> = ({
         setStep(2); // Automatically advance to Step 2: Barcode Scanner
       } else {
         const errData = await res.json().catch(() => ({}));
-        throw new Error(errData.error || 'Only real food or drink packets can be scanned. Please do not scan people, animals, or non-food objects.');
+        throw new Error(errData.error || 'Please hold up a food packet or nutrition facts label to scan.');
       }
     } catch (e: any) {
       console.warn('Recognition failed:', e);
@@ -433,6 +479,8 @@ export const CameraScanner: React.FC<CameraScannerProps> = ({
 
       if (res.ok) {
         const ocrData = await res.json();
+        // Tactile pulse for successful label OCR extraction
+        triggerHaptic([35, 40, 40]);
         if (ocrData.calories || ocrData.sodium || ocrData.sugar || ocrData.ingredients) {
           finalNutrition = {
             servingSize: ocrData.servingSize || finalNutrition.servingSize || '100g',
@@ -499,6 +547,9 @@ export const CameraScanner: React.FC<CameraScannerProps> = ({
 
   // Direct completion from Step 3 without scanning back (using verified database values)
   const handleCompleteDirect = () => {
+    // Tactile confirmation click on final capture completion
+    triggerHaptic([30, 40, 50]);
+
     onCaptureComplete({
       productName: productMetadata.name || 'Packaged Food Product',
       brand: productMetadata.brand || '',
@@ -584,7 +635,7 @@ export const CameraScanner: React.FC<CameraScannerProps> = ({
         {/* Step Indicator Pill */}
         <div className="px-3.5 py-1.5 rounded-full bg-black/60 backdrop-blur-md border border-white/10 text-white/90 text-xs font-medium tracking-wide flex items-center gap-1.5 shadow-sm">
           <span className={`w-1.5 h-1.5 rounded-full ${step === 2 ? 'bg-rose-400' : 'bg-emerald-400'} animate-pulse`} />
-          {step === 1 && (isHindi ? 'स्टेप 1: फ्रंट पैकेट' : isBengali ? 'ধাপ ১: সামনের দিক' : 'Step 1: Front Packet')}
+          {step === 1 && (isHindi ? 'स्टेप 1: पैकेट या न्यूट्रिशन लेबल' : isBengali ? 'ধাপ ১: প্যাকেট বা পুষ্টি লেবেল' : 'Step 1: Packet or Nutrition Label')}
           {step === 2 && (isHindi ? 'स्टेप 2: बारकोड स्कैन (सटीक)' : isBengali ? 'ধাপ ২: বারকোড স্ক্যান' : 'Step 2: Barcode Scan')}
           {step === 3 && (isHindi ? 'स्टेप 3: समीक्षा (वैकल्पिक)' : isBengali ? 'ধাপ ৩: পুষ্টি তালিকা' : 'Step 3: Review / Back Label')}
         </div>
@@ -664,7 +715,17 @@ export const CameraScanner: React.FC<CameraScannerProps> = ({
               <h4 className="text-base font-semibold">Camera Access</h4>
               <p className="text-xs text-white/60 max-w-xs">{cameraError}</p>
             </div>
-            <div className="flex gap-2">
+            <div className="flex flex-wrap gap-2 justify-center">
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  initCamera();
+                }}
+                className="px-4 py-2.5 rounded-full bg-emerald-500 text-white text-xs font-semibold shadow-md active:scale-95 transition-transform flex items-center gap-1.5"
+              >
+                <RefreshCw className="w-3.5 h-3.5" />
+                <span>Retry Camera</span>
+              </button>
               <button
                 onClick={(e) => {
                   e.stopPropagation();
@@ -714,7 +775,7 @@ export const CameraScanner: React.FC<CameraScannerProps> = ({
           </div>
         )}
 
-        {/* STEP 1: Front Packet Scanning Reticle */}
+        {/* STEP 1: Front Packet or Nutrition Label Scanning Reticle */}
         {step === 1 && (
           <div
             className={`relative w-76 h-96 rounded-[26px] border border-white/80 shadow-[0_0_0_9999px_rgba(0,0,0,0.52)] flex flex-col items-center justify-between p-6 pointer-events-none transition-all duration-300 ${
@@ -727,17 +788,24 @@ export const CameraScanner: React.FC<CameraScannerProps> = ({
 
             <div className="w-full flex justify-center">
               <span className="bg-black/60 backdrop-blur-md px-3.5 py-1 rounded-full text-white text-xs font-normal border border-white/10 flex items-center gap-1.5">
-                <span>Point at front of food packet</span>
+                <span>{isHindi ? 'पैकेट या न्यूट्रिशन लेबल दिखाएं' : isBengali ? 'প্যাকেট বা পুষ্টি লেবেল দেখান' : 'Point at food packet or nutrition label'}</span>
               </span>
             </div>
 
-            <div className="text-center">
-              <p className="text-white/80 text-xs font-normal">
+            <div className="text-center px-2">
+              <p className="text-white/90 text-xs font-medium">
                 {isHindi
-                  ? 'पैकेट का अगला भाग दिखाएं और शटर दबाएं'
+                  ? 'पैकेट का अगला भाग या पोषण तालिका (Nutrition Facts) दिखाएं'
                   : isBengali
-                  ? 'প্যাকেটের সামনের দিক তাক করে শাটার চাপুন'
-                  : 'Center packet in frame & tap shutter'}
+                  ? 'প্যাকেট বা পুষ্টি লেবেল (Nutrition Facts) ফ্রেম করে শাটার চাপুন'
+                  : 'Frame food packet or nutrition facts label & tap shutter'}
+              </p>
+              <p className="text-white/60 text-[11px] mt-0.5">
+                {isHindi
+                  ? 'हाथ में पकड़कर या वेबकैम के सामने आराम से दिखाएं'
+                  : isBengali
+                  ? 'হাতে ধরে বা ক্যামেরার সামনে যেকোনো দিক স্ক্যান করতে পারেন'
+                  : 'Works with packet front, cans, bottles, or back nutrition facts'}
               </p>
             </div>
           </div>
@@ -884,8 +952,8 @@ export const CameraScanner: React.FC<CameraScannerProps> = ({
             <div className="space-y-1">
               <p className="text-white text-base font-semibold tracking-tight">{loadingText}</p>
               <p className="text-white/60 text-xs">
-                {loadingText === 'Scanning product'
-                  ? 'Identifying packaging and brand…'
+                {loadingText.includes('Scanning') || loadingText.includes('स्कैन')
+                  ? 'Analyzing food packaging, brand, or nutrition facts…'
                   : loadingText.includes('barco') || loadingText.includes('बारकोड')
                   ? 'Accessing official nutrition registry with 0% error…'
                   : 'Extracting nutritional parameters…'}
@@ -996,7 +1064,7 @@ export const CameraScanner: React.FC<CameraScannerProps> = ({
           <button
             onClick={() => handleCaptureFront()}
             disabled={isProcessing}
-            aria-label="Capture food packet"
+            aria-label="Capture food packet or nutrition label"
             className="group relative w-19 h-19 rounded-full border-4 border-white/80 p-1 flex items-center justify-center active:scale-90 transition-transform backdrop-blur-md shadow-[0_4px_24px_rgba(0,0,0,0.35)]"
           >
             <div className="w-full h-full rounded-full bg-white transition-all group-hover:scale-95 group-active:scale-90 shadow-inner" />
@@ -1065,6 +1133,11 @@ export const CameraScanner: React.FC<CameraScannerProps> = ({
           </button>
         </div>
       )}
+
+      {/* Sleek Minimal Animated Tag */}
+      <div className="relative z-20 pb-2 flex justify-center pointer-events-auto">
+        <MadeByFooter variant="dark" />
+      </div>
     </div>
   );
 };

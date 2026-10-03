@@ -178,21 +178,8 @@ export const LoginPage: React.FC<LoginPageProps> = ({
         </div>
       </div>
 
-      {/* THE ONLY ONE "Made With ❤️ by Nirmalya !" LINE */}
-      {/* Placed at the lowest visible minimal part of the login page */}
-      <footer className="w-full text-center z-10 pb-2 pt-4">
-        <p className="text-xs font-medium text-[#737373] tracking-normal select-none inline-flex items-center justify-center">
-          <span>Made With </span>
-          <span
-            className="animate-heart-pump text-rose-500 mx-1.5 text-sm select-none"
-            role="img"
-            aria-label="heart"
-          >
-            ❤️
-          </span>
-          <span> by Nirmalya !</span>
-        </p>
-      </footer>
+      {/* Made with ❤️ by Nirmalya ! */}
+      <MadeByFooter className="pb-3 pt-4" />
     </div>
   );
 };

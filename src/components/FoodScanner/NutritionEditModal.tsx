@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { NutritionData, UserProfile } from '../../types';
 import { ArrowLeft, Check, Edit3, AlertCircle, Sparkles, CheckCircle2 } from 'lucide-react';
+import { MadeByFooter } from '../Common/MadeByFooter';
 
 interface NutritionEditModalProps {
   initialData: {
@@ -368,7 +369,7 @@ export const NutritionEditModal: React.FC<NutritionEditModalProps> = ({
       </div>
 
         {/* Sticky Bottom Action */}
-        <div className="sticky bottom-0 z-30 bg-[#FBFBFA]/95 backdrop-blur-md border-t border-black/[0.06] p-4 shrink-0">
+        <div className="sticky bottom-0 z-30 bg-[#FBFBFA]/95 backdrop-blur-md border-t border-black/[0.06] p-4 shrink-0 space-y-2">
           <button
             onClick={handleSubmit}
             className="w-full py-3.5 rounded-full bg-[#161616] text-white text-sm font-semibold shadow-md active:scale-[0.985] transition-all flex items-center justify-center gap-2 liquid-ripple"
@@ -376,6 +377,7 @@ export const NutritionEditModal: React.FC<NutritionEditModalProps> = ({
             <span>{isHindi ? 'स्वास्थ्य विश्लेषण शुरू करें' : isBengali ? 'স্বাস্থ্য বিশ্লেষণ শুরু করুন' : 'Confirm & Analyze Health'}</span>
             <Check className="w-4 h-4" />
           </button>
+          <MadeByFooter variant="pill" className="pt-0.5" />
         </div>
       </div>
     </div>

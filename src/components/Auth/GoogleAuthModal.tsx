@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { UserAccount } from '../../types';
 import { X, Check, ShieldCheck, LogOut, AlertCircle } from 'lucide-react';
 import { signInWithGoogle, logoutGoogle } from '../../firebase';
+import { MadeByFooter } from '../Common/MadeByFooter';
 
 interface GoogleAuthModalProps {
   currentUser: UserAccount | null;
@@ -177,6 +178,9 @@ export const GoogleAuthModal: React.FC<GoogleAuthModalProps> = ({
             </div>
           </div>
         )}
+
+        {/* Sleek Minimal Animated Tag */}
+        <MadeByFooter variant="pill" className="pt-3" />
       </div>
     </div>
   );
